@@ -119,8 +119,13 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
             <button className="close" aria-label={ui.close} onClick={() => setOpen(false)}>×</button>
             {game ? <Play key={game.id} game={game} api={api} store={store} locale={locale} onClose={() => setOpen(false)} /> : (
               <div className="picker">
+                <Bulbs />
+                <h2 className="marquee">{ui.choose}</h2>
                 {games.map((g) => (
-                  <button key={g.id} className="btn" onClick={() => setGame(g)}>{t(g.texts?.heading, locale) || g.name}</button>
+                  <button key={g.id} className="pick" onClick={() => setGame(g)}>
+                    <span className="pick-ico" aria-hidden="true">{GAME_TYPES[g.type]?.icon}</span>
+                    <span className="pick-txt">{t(g.texts?.heading, locale) || g.name}<small>{GAME_TYPES[g.type]?.label}</small></span>
+                  </button>
                 ))}
               </div>
             )}
@@ -194,15 +199,17 @@ function Play({ game, api, store, locale, onClose }) {
 
   if (!result) {
     return (
-      <form className="screen" onSubmit={submit}>
-        <h2>{heading}</h2>
+      <form className="screen gate" onSubmit={submit}>
+        <Bulbs />
+        <h2 className="marquee">{heading}</h2>
+        <div className="suits" aria-hidden="true"><span>♠</span><span>♥</span><span>♦</span><span>♣</span></div>
         {sub && <p className="muted">{sub}</p>}
         <label className="field">
           <span>{ui.emailLabel}</span>
           <input type="email" required autoComplete="email" inputMode="email" value={email} placeholder={ui.emailPlaceholder} onChange={(e) => setEmail(e.target.value)} />
         </label>
         {error && <p className="error" role="alert">{error}</p>}
-        <button className="btn" disabled={busy}>{busy ? ui.sending : ui.start}</button>
+        <button className="btn play" disabled={busy}>{busy ? ui.sending : ui.start}</button>
         {(privacy || game.texts?.privacyUrl) && (
           <p className="fine">{privacy} {game.texts?.privacyUrl && <a href={game.texts.privacyUrl} target="_blank" rel="noopener noreferrer">{locale === 'fr' ? 'Politique de confidentialité' : 'Privacy policy'}</a>}</p>
         )}
@@ -214,12 +221,13 @@ function Play({ game, api, store, locale, onClose }) {
     const Stage = stages[stage];
     const next = () => (stage + 1 < stages.length ? setStage(stage + 1) : setDone(true));
     // a wheel that follows another stage gets its own heading
-    return <div className="screen"><h2>{stage > 0 ? ui.spinHeading : heading}</h2><Stage key={stage} game={game} result={result} locale={locale} onDone={next} /></div>;
+    return <div className="screen"><h2 className="marquee">{stage > 0 ? ui.spinHeading : heading}</h2><Stage key={stage} game={game} result={result} locale={locale} onDone={next} /></div>;
   }
 
   return (
     <div className="screen result">
       <Confetti />
+      <Bulbs />
       <h2 className="congrats marquee">{ui.congrats}</h2>
       <p className="muted won">{result.rewards.length > 1 ? ui.yourRewards : ui.yourReward}</p>
       {result.rewards.map((r) => <RewardCard key={r.id} r={r} locale={locale} />)}
