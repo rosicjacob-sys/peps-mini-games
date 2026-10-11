@@ -10,15 +10,14 @@ export default function Library() {
   const [items, setItems] = useState(null); const [editing, setEditing] = useState(null); const [note, setNote] = useState(''); const [q, setQ] = useState('');
   const load = () => api.library().then(setItems);
   useEffect(() => { load(); }, []);
-  const doImport = async () => { const r = await api.importLibrary(); setNote(r.created || r.linked ? `Imported ${r.created} reward${r.created === 1 ? '' : 's'} from your games and linked ${r.linked} game reward${r.linked === 1 ? '' : 's'} to them.` : 'Nothing to import — every game reward is already in the library.'); load(); };
-  // games using it keep the reward as their own (same code and odds), so nothing breaks
+  // games using it lose the reward; in each, its odds move to "No reward" so the game still adds up to 100%
   const remove = async (x) => {
     const names = [...new Set(x.games.map((g) => `${g.game} · ${g.store}`))];
-    const used = x.used_in ? `\n\n${x.used_in} game${x.used_in === 1 ? ' uses' : 's use'} it (${names.slice(0, 3).join(', ')}${names.length > 3 ? `, +${names.length - 3} more` : ''}). ${x.used_in === 1 ? 'That game keeps it as its' : 'Those games keep it as their'} own reward with the same code and odds — remove it from a game in its Rewards tab.` : '';
+    const used = x.used_in ? `\n\nIt will also be removed from ${names.length === 1 ? 'this game' : `these ${names.length} games`}: ${names.slice(0, 3).join(', ')}${names.length > 3 ? `, +${names.length - 3} more` : ''}. Its chance moves to "No reward" in ${names.length === 1 ? 'that game' : 'each game'} — adjust the odds in the game's Rewards tab if you want it to go elsewhere.` : '';
     if (!confirm(`Delete "${x.title.en}" from the library?${used}`)) return false;
     try {
       const r = await api.deleteLibrary(x.id);
-      setNote(`Deleted "${x.title.en}" from the library.${r?.games_unlinked ? ` ${r.games_unlinked} game reward${r.games_unlinked === 1 ? '' : 's'} kept as custom reward${r.games_unlinked === 1 ? '' : 's'}.` : ''}`);
+      setNote(`Deleted "${x.title.en}".${r?.games_updated ? ` Removed from ${r.games_updated} game${r.games_updated === 1 ? '' : 's'}; its chance moved to "No reward" there.` : ''}`);
       setEditing(null); load(); return true;
     } catch (e) { setNote(e.message); return false; }
   };
@@ -26,7 +25,7 @@ export default function Library() {
   return (
     <>
       <PageHead title="Rewards library" sub="Enter each reward once, then add it to any game from the game's Rewards tab. Editing a reward here updates every game that uses it."
-        actions={<><button className="ghost" onClick={doImport}>Import from my games</button><button className="primary" onClick={() => setEditing('new')}>+ New reward</button></>} />
+        actions={<button className="primary" onClick={() => setEditing('new')}>+ New reward</button>} />
       {note && <div className="alert info">{note}</div>}
       {editing === 'new' && <LibForm onCancel={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
       {items && items.length > 0 && (
@@ -52,8 +51,8 @@ export default function Library() {
       </div>
       {items && !items.length && editing !== 'new' && (
         <div className="card empty-state"><b>No rewards in the library yet</b>
-          <p className="muted">Create one, or import the rewards you've already set up in your games.</p>
-          <div className="row"><button className="ghost" onClick={doImport}>Import from my games</button><button className="primary" onClick={() => setEditing('new')}>+ New reward</button></div></div>
+          <p className="muted">Create your rewards here, then add them to games from each game's Rewards tab.</p>
+          <div className="row"><button className="primary" onClick={() => setEditing('new')}>+ New reward</button></div></div>
       )}
     </>
   );

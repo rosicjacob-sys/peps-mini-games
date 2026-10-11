@@ -132,7 +132,7 @@ adminRouter.put('/games/:id/rewards', wrap(async (req, res) => {
     id: r.id || null, title: loc(r.title), subtitle: loc(r.subtitle), code: String(r.code || '').trim().slice(0, 80),
     probability: Math.max(0, Math.min(100, Number(r.probability) || 0)), active: r.active !== false, sort: i,
   }));
-  if (clean.some((r) => !r.title.en || !r.code)) return res.status(400).json({ error: 'Every reward needs an English title and a code.' });
+  if (clean.some((r) => !r.library_id)) return res.status(400).json({ error: 'Rewards come from the rewards library — add them with "+ Add from library".' });
   const max = GAME_TYPES[g.type]?.maxRewards;
   if (max && clean.filter((r) => r.active).length > max) return res.status(400).json({ error: `${GAME_TYPES[g.type].label} has ${max} colours, so it can have at most ${max} active rewards.` });
   const lose = Math.max(0, Math.min(100, Number(req.body.lose_percent) || 0));
@@ -184,15 +184,24 @@ adminRouter.put('/library/:id', wrap(async (req, res) => {
     FROM games g WHERE g.id = r.game_id AND r.library_id = $1`, [req.params.id, f.title, f.subtitle, f.code, f.symbol]);
   res.json({ ...rows[0], games_updated: rowCount });
 }));
-// games that use a deleted reward keep it as their own reward (same code and odds); only the link goes (ON DELETE SET NULL)
+// Deleting a library reward removes it from every game using it; in each game its odds move to "No reward",
+// so the game still adds up to 100%.
 adminRouter.delete('/library/:id', wrap(async (req, res) => {
-  const { rows: [u] } = await q('SELECT count(*)::int AS n FROM rewards WHERE library_id = $1', [req.params.id]);
-  const { rowCount } = await q('DELETE FROM reward_library WHERE id = $1', [req.params.id]);
-  if (!rowCount) return res.sendStatus(404);
-  res.json({ games_unlinked: u.n });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: used } = await client.query(`SELECT game_id, sum(probability) FILTER (WHERE active) AS freed FROM rewards WHERE library_id = $1 GROUP BY game_id`, [req.params.id]);
+    for (const u of used) await client.query('UPDATE games SET lose_percent = LEAST(100, lose_percent + $2) WHERE id = $1', [u.game_id, Number(u.freed) || 0]);
+    await client.query('DELETE FROM rewards WHERE library_id = $1', [req.params.id]);
+    const { rowCount } = await client.query('DELETE FROM reward_library WHERE id = $1', [req.params.id]);
+    if (!rowCount) { await client.query('ROLLBACK'); return res.sendStatus(404); }
+    await client.query('COMMIT');
+    res.json({ games_updated: used.length });
+  } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 }));
-// turn rewards already typed into games into library entries (same code + English title = one entry) and link them
-adminRouter.post('/library/import', wrap(async (_req, res) => {
+// Games take rewards only from the library. Any reward typed straight into a game (from before the library existed)
+// becomes a library entry (same code + English title = one entry) and is linked to it. Runs at startup.
+export async function linkCustomRewards() {
   const client = await pool.connect(); let created = 0, linked = 0;
   try {
     await client.query('BEGIN');
@@ -204,8 +213,8 @@ adminRouter.post('/library/import', wrap(async (_req, res) => {
     }
     await client.query('COMMIT');
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
-  res.json({ created, linked });
-}));
+  return { created, linked };
+}
 
 // ---- stats: players, rewards tally
 adminRouter.get('/games/:id/stats', wrap(async (req, res) => {

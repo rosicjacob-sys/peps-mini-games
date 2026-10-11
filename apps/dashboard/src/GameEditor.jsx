@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from './api.js';
 import Overview from './pages/Overview.jsx';
-import { GAME_TYPES, THEMES, SLOT_ICONS, INTRO_DEFAULTS, UI, themeFor, t, singleReward } from '@peps/shared';
+import { GAME_TYPES, THEMES, INTRO_DEFAULTS, UI, themeFor, t, singleReward } from '@peps/shared';
 import { pokerTiers, COLORS } from '@peps/shared/cards.js';
 
 const TABS = ['Stats', 'Rewards', 'Intro popup', 'Appearance', 'Texts & Email'];
-const blankReward = () => ({ title: { en: '', fr: '' }, subtitle: { en: '', fr: '' }, code: '', probability: 0, active: true });
 
 export default function GameEditor({ id, back }) {
   const [game, setGame] = useState(null); const [tab, setTab] = useState('Stats');
@@ -66,29 +65,15 @@ function Rewards({ game, reload }) {
     <>
       <p className="muted">Each play, the server picks {singleReward(game.type) ? 1 : game.rewards_per_play} reward{game.type === 'wheel' && game.rewards_per_play > 1 ? 's' : ''} using these probabilities.{game.type === 'slots' && ' All three reels stop on the winning reward\'s symbol.'}{game.type === 'poker' && ' Each reward is paid on a poker hand: the more likely the reward, the weaker the hand.'}{game.type === 'color' && ' Each active reward sits on one of six colours, in this order.'}{['lucky9', 'baccarat'].includes(game.type) && ' The player wins the hand, then spins a wheel; these probabilities decide where it lands.'}{game.type === 'blackjack' && ' The player wins a warm-up hand, then spins a wheel; these probabilities decide where the wheel lands.'} Active rewards must add up to 100%. Codes must already exist in your discount app.</p>
       {rows.map((r, i) => (
-        <div key={r.id || i} className={`card reward-row ${r.active ? '' : 'off'} ${r.library_id ? 'linked' : ''}`}>
-          {r.library_id ? (
-            <div className="linked-head">
-              <span className="lib-icon" aria-hidden="true">{r.symbol || '🎁'}</span>
-              <div className="lib-text"><b>{t(r.title, 'en')}</b><span className="muted small">{[t(r.title, 'fr'), t(r.subtitle, 'en')].filter(Boolean).join(' · ')}</span></div>
-              <code>{r.code}</code>
-              <span className="pill">Library</span>
-              <a className="small" href="#/rewards">Edit in library</a>
-              <button className="link small" onClick={() => set(i, { library_id: null })} title="Keep a separate copy you can edit just for this game">Make custom</button>
-            </div>
-          ) : (
-            <>
-              <Loc label="Title" value={r.title} onChange={(v) => set(i, { title: v })} ph="Free Reta" />
-              <Loc label="Subtitle" value={r.subtitle} onChange={(v) => set(i, { subtitle: v })} ph="One vial on us" />
-            </>
-          )}
+        <div key={r.id || i} className={`card reward-row linked ${r.active ? '' : 'off'}`}>
+          <div className="linked-head">
+            <span className="lib-icon" aria-hidden="true">{r.symbol || '🎁'}</span>
+            <div className="lib-text"><b>{t(r.title, 'en')}</b><span className="muted small">{[t(r.title, 'fr'), t(r.subtitle, 'en')].filter(Boolean).join(' · ')}</span></div>
+            <code>{r.code}</code>
+            <a className="small" href="#/rewards">Edit in library</a>
+          </div>
           <div className="row">
-            {!r.library_id && <label>Code<input value={r.code} onChange={(e) => set(i, { code: e.target.value })} placeholder="FREERETA" /></label>}
             <label>Probability %<input className="num-in" type="number" min="0" max="100" step="0.5" value={r.probability} onChange={(e) => set(i, { probability: e.target.value })} /></label>
-            {game.type === 'slots' && !r.library_id && (
-              <label>Reel icon<select value={r.symbol || ''} onChange={(e) => set(i, { symbol: e.target.value || null })}>
-                <option value="">Auto</option>{SLOT_ICONS.map((x) => <option key={x.key} value={x.glyph}>{x.glyph} {x.label}</option>)}</select></label>
-            )}
             {game.type === 'poker' && r.active && <span className="pill">Paid on: {UI.en.poker.hands[tiers[r.id || `new${i}`]]}</span>}
             {colorOf(i) && <span className="pill"><i className="dot" style={{ background: colorOf(i).hex }} />{colorOf(i).key}</span>}
             {game.type === 'color' && r.active && !colorOf(i) && <span className="pill failed">no colour left (max 6)</span>}
@@ -109,7 +94,6 @@ function Rewards({ game, reload }) {
       </div>
       <div className="row sticky">
         <button className="primary-outline" onClick={() => setPicking(true)}>+ Add from library</button>
-        <button onClick={() => setRows([...rows, blankReward()])}>+ Custom reward</button>
         <button onClick={equalise}>Split evenly</button>
         <strong className={ok ? 'good' : 'bad'}>Total: {total.toFixed(2)}%</strong>
         <button className="primary" disabled={!ok && rows.some((r) => r.active)} onClick={save}>Save rewards</button>

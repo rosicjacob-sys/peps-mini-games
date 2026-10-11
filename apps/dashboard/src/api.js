@@ -26,7 +26,6 @@ export const api = {
   createLibrary: (b) => req('/library', { method: 'POST', body: b }),
   updateLibrary: (id, b) => req(`/library/${id}`, { method: 'PUT', body: b }),
   deleteLibrary: (id) => req(`/library/${id}`, { method: 'DELETE' }),
-  importLibrary: () => req('/library/import', { method: 'POST' }),
   groups: () => req('/groups'),
   createGroup: (b) => req('/groups', { method: 'POST', body: b }),
   updateGroup: (id, b) => req(`/groups/${id}`, { method: 'PUT', body: b }),
