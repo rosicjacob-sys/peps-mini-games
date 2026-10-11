@@ -35,7 +35,7 @@ export const api = {
   createGame: (b) => req('/games', { method: 'POST', body: b }),
   updateGame: (id, b) => req(`/games/${id}`, { method: 'PUT', body: b }),
   deleteGame: (id) => req(`/games/${id}`, { method: 'DELETE' }),
-  saveRewards: (id, rewards) => req(`/games/${id}/rewards`, { method: 'PUT', body: { rewards } }),
+  saveRewards: (id, rewards, lose_percent = 0) => req(`/games/${id}/rewards`, { method: 'PUT', body: { rewards, lose_percent } }),
   // reports — every call takes the global filters { from, to, group_id, store_id, game_id }
   overview: (f) => req(`/reports/overview?${qs(f)}`),
   players: (f) => req(`/players?${qs(f)}`),

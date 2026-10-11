@@ -18,6 +18,12 @@ render.yaml      Render Blueprint
 - A game has **rewards**: bilingual title + subtitle, a code that already exists in your discount app, and a
   probability %. Active rewards must total 100%. `Rewards per play` controls how many are drawn per play.
 - The **server** rolls the outcome (the widget only animates it), so odds can't be tampered with in the browser.
+- **Losing.** Each game has a "No reward" chance next to the reward probabilities (together they total 100%). A lost
+  play is lost in the game itself (dealer/banker wins, no match, no winning hand, or "Try again" on the wheel), sends no
+  email, and ends on "Not this time — try again on <next Monday>" with a note about weekly promotions. It still uses
+  that week's play. Reports show "No reward (lost)" per game against the chance you set.
+- **Card rules.** Lucky 9: the player may draw unless they hold a natural 9; the banker draws on 0–5 and never ends on 9.
+  Blackjack: the dealer never reaches 21. Baccarat: standard third-card rules; the banker never ends on 9.
 - **One play per email per game per week.** Weeks run Monday 12:00 AM → Sunday 11:59 PM ET (America/Toronto);
   codes are stated as single-use and expiring Sunday 11:59 PM ET. Gmail dots/`+tags` are normalised.
 - The code is shown on screen and emailed through Resend (from-address is set per game).
@@ -66,7 +72,7 @@ Changing a `VITE_*` var needs a redeploy of that static site.
 
 **Test emails.** `mosada.jerome.d@gmail.com`, `vantatechca@gmail.com` and `rosicjacob@gmail.com` can play without
 limit; their plays are not counted in stats, tallies or exports, and they still receive the code email. Change the
-list with `TEST_EMAILS=a@x.com,b@y.com` on the API service.
+list with `TEST_EMAILS=a@x.com,b@y.com` on the API service. `PLAY_RATE_LIMIT` (default 20) caps plays per minute per IP.
 
 ## Local dev
 ```

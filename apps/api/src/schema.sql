@@ -98,3 +98,6 @@ ALTER TABLE plays ADD COLUMN IF NOT EXISTS last_email_at timestamptz;
 CREATE INDEX IF NOT EXISTS plays_created_idx ON plays(created_at);
 CREATE INDEX IF NOT EXISTS plays_email_idx ON plays(email_norm);
 CREATE INDEX IF NOT EXISTS play_rewards_play_idx ON play_rewards(play_id);
+
+-- chance (percent) that a play wins nothing; active reward probabilities + lose_percent = 100
+ALTER TABLE games ADD COLUMN IF NOT EXISTS lose_percent numeric(6,3) NOT NULL DEFAULT 0;

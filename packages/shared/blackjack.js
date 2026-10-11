@@ -99,7 +99,8 @@ function build(target, rand) {
   const draws = []; let t = p[0] + p[1]; const totals = [t];
   while (t < 21 && draws.length < 5) { const v = between(2, 10, rand); draws.push(v); t += v; if (t <= 21) totals.push(t); }
   const maxT = Math.max(...totals);
-  const final = between(Math.max(17, maxT + 1), 21, rand), up = between(2, 10, rand);
+  if (maxT >= 20) return { plans: [null] };              // the dealer never reaches 21, so they can't beat 20 — retry
+  const final = between(Math.max(17, maxT + 1), 20, rand), up = between(2, 10, rand);
   const seq = dealerSequence(up, final, rand);
   return { player: p, playerDraws: draws, up, plans: [...Array(draws.length + 1)].map(() => seq) };
 }
@@ -121,11 +122,12 @@ export function buildScript(target, rand = Math.random) {
   throw new Error(`could not build a blackjack script for ${target}`);
 }
 
-// True when every possible player path (0..n hits) ends in the target outcome.
+// True when every possible player path (0..n hits) ends in the target outcome — and the dealer never shows 21.
 export function verifyScript(script) {
   for (let k = 0; k <= script.playerDraws.length; k++) {
     if (k > 0 && !canHit(script, k - 1)) break;
-    if (playRound(script, k).outcome !== script.target) return false;
+    const r = playRound(script, k);
+    if (r.outcome !== script.target || handValue(r.dealer) === 21) return false;
   }
   return true;
 }

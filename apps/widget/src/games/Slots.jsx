@@ -11,11 +11,16 @@ export default function Slots({ game, result, locale, onDone }) {
   const ui = UI[locale];
   // Reels show the rewards themselves; three matching tiles = that reward.
   const tiles = game.rewards.map((r, i) => ({ id: r.id, icon: symbolFor(r, i), title: t(r.title, locale) }));
-  const win = tiles.find((x) => x.id === result.rewards[0].id) || tiles[0];
+  const lost = !!result.lost;
+  const win = lost ? null : tiles.find((x) => x.id === result.rewards[0].id) || tiles[0];
   // Decoys are the other rewards; never put the winner right next to the pay line on a losing row.
-  const others = tiles.filter((x) => x.id !== win.id);
-  const pick = (i) => (others.length && Math.abs(i - TARGET_AT) === 1 ? others[Math.floor(Math.random() * others.length)] : (others.length && Math.random() < 0.75 ? others[Math.floor(Math.random() * others.length)] : win));
-  const strips = useRef([0, 1, 2].map(() => Array.from({ length: STRIP }, (_, i) => (i === TARGET_AT ? win : pick(i))))).current;
+  const others = lost ? tiles : tiles.filter((x) => x.id !== win.id);
+  const rnd = (a) => a[Math.floor(Math.random() * a.length)];
+  // decoys: on a win, mostly other rewards and never the winner right next to the pay line; on a loss, any tile
+  const pick = (i) => (lost ? rnd(tiles) : others.length && (Math.abs(i - TARGET_AT) === 1 || Math.random() < 0.75) ? rnd(others) : win);
+  // a loss: the pay line shows tiles that never all match
+  const loseLine = useRef((() => { const a = tiles[Math.floor(Math.random() * tiles.length)]; const rest = tiles.filter((x) => x.id !== a.id); const b = rest.length ? rest[Math.floor(Math.random() * rest.length)] : a; const c = tiles[Math.floor(Math.random() * tiles.length)]; return [a, b, c]; })()).current;
+  const strips = useRef([0, 1, 2].map((reel) => Array.from({ length: STRIP }, (_, i) => (i === TARGET_AT ? (lost ? loseLine[reel] : win) : pick(i))))).current;
   const [spinning, setSpinning] = useState(false);
   const [went, setWent] = useState(false);
   const done = useRef(false);

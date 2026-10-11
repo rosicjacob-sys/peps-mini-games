@@ -38,7 +38,7 @@ export default function Players({ initial = {}, clearInitial }) {
               <tr key={r.email_norm} className="click" onClick={() => setOpen(r.email)} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setOpen(r.email)}>
                 <td><b>{r.email}</b>{r.failed > 0 && <span className="pill failed" title="A code email to this player failed">✕ email</span>}</td>
                 <td className="num">{fmtInt(r.plays)}</td>
-                <td>{tr(r.last_reward)}</td>
+                <td>{r.last_reward ? tr(r.last_reward) : <span className="muted">No reward</span>}</td>
                 <td className="muted">{r.stores.join(', ')}</td>
                 <td><span className="pill">{r.locale.toUpperCase()}</span></td>
                 <td className="muted nowrap">{fmtDateShort(r.first_at)}</td>
@@ -82,12 +82,12 @@ export function PlayerDrawer({ email, onClose }) {
                 <li key={p.id}>
                   <div className="tl-when">{fmtDateTime(p.created_at)}</div>
                   <div className="tl-body">
-                    <div><b>{(p.rewards || []).map((x) => tr(x.title)).join(', ')}</b> {(p.rewards || []).map((x) => <code key={x.code}>{x.code}</code>)}</div>
+                    <div><b>{p.rewards ? p.rewards.map((x) => tr(x.title)).join(', ') : 'No reward (lost)'}</b> {(p.rewards || []).map((x) => <code key={x.code}>{x.code}</code>)}</div>
                     <div className="muted small">{TYPE_LABEL[p.type]} · {p.store}{p.store_group ? ` · ${p.store_group}` : ''} · {p.locale.toUpperCase()}</div>
                     <div className="tl-status">
-                      <span className={`pill ${p.email_status}`}>{{ sent: '✓ email sent', failed: '✕ email failed', pending: '… pending' }[p.email_status]}</span>
+                      <span className={`pill ${p.email_status}`}>{{ sent: '✓ email sent', failed: '✕ email failed', pending: '… pending', skipped: 'no email (lost)' }[p.email_status]}</span>
                       {p.is_test && <span className="pill">test</span>}
-                      {p.email_status !== 'sent' && <button className="ghost small" disabled={busy === p.id} onClick={() => resend(p.id)}>{busy === p.id ? 'Sending…' : 'Resend code'}</button>}
+                      {['failed', 'pending'].includes(p.email_status) && <button className="ghost small" disabled={busy === p.id} onClick={() => resend(p.id)}>{busy === p.id ? 'Sending…' : 'Resend code'}</button>}
                     </div>
                     {p.email_error && <div className="muted small">{p.email_error}</div>}
                   </div>

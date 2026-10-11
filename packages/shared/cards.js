@@ -10,25 +10,28 @@ const shuffle = (a, rand) => { a = [...a]; for (let i = a.length - 1; i > 0; i--
 export const pointValue = (c) => (c.r === 'A' ? 1 : ['10', 'J', 'Q', 'K'].includes(c.r) ? 0 : Number(c.r));
 export const points = (cards) => cards.reduce((s, c) => s + pointValue(c), 0) % 10;
 
-// ---------- Lucky 9: player has 2 cards and may draw a third (not on a natural 8/9); the banker draws on 0–5.
-// A deal is only used if the player wins whether they draw or stand.
-export const lucky9Natural = (cards) => cards.length === 2 && points(cards) >= 8;
+// ---------- Lucky 9: the player may draw a third card unless they hold a natural 9 (which ends the round);
+// the banker draws on 0–5 and never finishes on 9. A deal is used only if it ends in the target result
+// ('win' | 'loss') whether the player draws or stands.
+export const lucky9Natural9 = (cards) => cards.length === 2 && points(cards) === 9;
+export const lucky9CanDraw = (player) => !lucky9Natural9(player);
 export function lucky9Banker(banker) { return points(banker.slice(0, 2)) <= 5 ? banker.slice(0, 3) : banker.slice(0, 2); }
 export function lucky9Round(script, drew) {
-  const natural = lucky9Natural(script.player);
-  const player = drew && !natural ? [...script.player, script.draw] : script.player;
-  // a player natural ends the round: the banker does not draw
-  const banker = natural ? script.banker.slice(0, 2) : lucky9Banker(script.banker);
+  const nat = lucky9Natural9(script.player);
+  const player = drew && !nat ? [...script.player, script.draw] : script.player;
+  const banker = nat ? script.banker.slice(0, 2) : lucky9Banker(script.banker);
   const p = points(player), b = points(banker);
   return { player, banker, p, b, outcome: p > b ? 'win' : p === b ? 'tie' : 'loss' };
 }
-export function buildLucky9(rand = Math.random) {
-  for (let i = 0; i < 5000; i++) {
+export function buildLucky9(target = 'win', rand = Math.random) {
+  if (typeof target === 'function') { rand = target; target = 'win'; }
+  for (let i = 0; i < 20000; i++) {
     const d = shuffle(deck(), rand);
-    const s = { player: [d[0], d[2]], banker: [d[1], d[3], d[5]], draw: d[4] };
-    if (lucky9Round(s, false).outcome === 'win' && lucky9Round(s, true).outcome === 'win') return s;
+    const s = { player: [d[0], d[2]], banker: [d[1], d[3], d[5]], draw: d[4], target };
+    const a = lucky9Round(s, false), b = lucky9Round(s, true);
+    if (a.outcome === target && b.outcome === target && a.b !== 9 && b.b !== 9 && points(s.banker.slice(0, 2)) !== 9) return s;
   }
-  throw new Error('could not build a lucky 9 deal');
+  throw new Error(`could not build a lucky 9 ${target} deal`);
 }
 
 // ---------- Baccarat with the standard third-card rules. Shoe order: P1 B1 P2 B2, then third cards as needed.
@@ -50,14 +53,20 @@ export function baccaratResolve(shoe) {
   const p = points(player), b = points(banker);
   return { player, banker, p, b, winner: p > b ? 'player' : b > p ? 'banker' : 'tie' };
 }
-// One deal per possible bet, each won by that bet.
-export function buildBaccarat(rand = Math.random) {
+// One deal per possible bet: won by that bet ('win'), or lost by it ('loss' — the other side wins; a Player or
+// Banker bet never loses to a tie). The banker never finishes on 9.
+export function buildBaccarat(target = 'win', rand = Math.random) {
+  if (typeof target === 'function') { rand = target; target = 'win'; }
+  const ok = (bet, w) => (target === 'win' ? w === bet : bet === 'tie' ? w !== 'tie' : w === (bet === 'player' ? 'banker' : 'player'));
   const deals = {};
   for (const bet of ['player', 'banker', 'tie']) {
-    for (let i = 0; i < 20000 && !deals[bet]; i++) { const shoe = shuffle(deck(), rand).slice(0, 6); if (baccaratResolve(shoe).winner === bet) deals[bet] = shoe; }
-    if (!deals[bet]) throw new Error(`could not build a baccarat deal for ${bet}`);
+    for (let i = 0; i < 40000 && !deals[bet]; i++) {
+      const shoe = shuffle(deck(), rand).slice(0, 6); const r = baccaratResolve(shoe);
+      if (ok(bet, r.winner) && r.b !== 9) deals[bet] = shoe;
+    }
+    if (!deals[bet]) throw new Error(`could not build a baccarat ${target} deal for ${bet}`);
   }
-  return { deals };
+  return { deals, target };
 }
 
 // ---------- Poker (5 cards, no draw). Every hand pays: rarer rewards get better hands.
@@ -87,7 +96,8 @@ export function buildPokerHand(target, rand = Math.random) {
     const rs = ranks(); const suits = () => shuffle(SUITS, rand);
     const of = (r, k) => suits().slice(0, k).map((s) => ({ r, s }));
     const singles = (list) => list.map((r) => ({ r, s: pick(SUITS) }));
-    if (target === 'pair') cards = [...of(rs[0], 2), ...singles(rs.slice(1, 4))];
+    if (target === 'high') cards = singles(rs.slice(0, 5));
+    else if (target === 'pair') cards = [...of(rs[0], 2), ...singles(rs.slice(1, 4))];
     else if (target === 'two_pair') cards = [...of(rs[0], 2), ...of(rs[1], 2), ...singles([rs[2]])];
     else if (target === 'three') cards = [...of(rs[0], 3), ...singles(rs.slice(1, 3))];
     else if (target === 'full_house') cards = [...of(rs[0], 3), ...of(rs[1], 2)];
@@ -118,6 +128,7 @@ export const COLORS = [
 ];
 export const COLOR_MAX = COLORS.length;
 export function colorDice(winIndex, nRewards, rand = Math.random) {
+  if (winIndex < 0) return shuffle([...Array(COLOR_MAX).keys()], rand).slice(0, 3); // a loss: no colour twice
   const three = rand() < 0.3;
   const others = shuffle([...Array(COLOR_MAX).keys()].filter((i) => i !== winIndex), rand);
   const dice = three ? [winIndex, winIndex, winIndex] : [winIndex, winIndex, others[0]];
