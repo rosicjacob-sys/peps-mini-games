@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from './api.js';
-import { GAME_TYPES, THEMES, SLOT_SYMBOLS, INTRO_DEFAULTS, themeFor, t } from '@peps/shared';
+import { GAME_TYPES, THEMES, SLOT_ICONS, INTRO_DEFAULTS, themeFor, t } from '@peps/shared';
 
 const TABS = ['Rewards', 'Players', 'Intro popup', 'Appearance', 'Texts & Email'];
 const blankReward = () => ({ title: { en: '', fr: '' }, subtitle: { en: '', fr: '' }, code: '', probability: 0, active: true });
@@ -61,8 +61,8 @@ function Rewards({ game, reload }) {
             <label>Code<input value={r.code} onChange={(e) => set(i, { code: e.target.value })} placeholder="FREERETA" /></label>
             <label>Probability %<input className="num-in" type="number" min="0" max="100" step="0.5" value={r.probability} onChange={(e) => set(i, { probability: e.target.value })} /></label>
             {game.type === 'slots' && (
-              <label>Reel symbol<select value={r.symbol || ''} onChange={(e) => set(i, { symbol: e.target.value || null })}>
-                <option value="">Auto</option>{SLOT_SYMBOLS.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
+              <label>Reel icon<select value={r.symbol || ''} onChange={(e) => set(i, { symbol: e.target.value || null })}>
+                <option value="">Auto</option>{SLOT_ICONS.map((x) => <option key={x.key} value={x.glyph}>{x.glyph} {x.label}</option>)}</select></label>
             )}
             <label className="check"><input type="checkbox" checked={r.active} onChange={(e) => set(i, { active: e.target.checked })} /> Active</label>
             <button className="danger" onClick={() => setRows(rows.filter((_, j) => j !== i))}>Remove</button>

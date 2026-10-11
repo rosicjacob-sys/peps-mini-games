@@ -34,6 +34,9 @@ render.yaml      Render Blueprint
 The popup waits for the age gate by watching for an element matching `[id*="age-gate"], [class*="age-gate"], [data-age-gate]`
 (matches the Lexar theme's `#meridian-age-gate`). If a store group's theme uses a different gate, set it on the script tag.
 
+**Display font.** Headings and primary buttons use "Coffee Tin" when it is self-hosted in `apps/widget/public/fonts/`
+(see the README there), otherwise "Rye" from Google Fonts.
+
 Optional attributes on the `<script>` tag:
 
 | Attribute | Purpose |

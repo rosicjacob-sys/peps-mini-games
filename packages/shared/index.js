@@ -19,8 +19,23 @@ export const THEMES = {
   'casino-purple': { label: 'Casino purple', bg: '#14081F', surface: '#1F0F33', text: '#FFFFFF', muted: '#C4B5FD', accent: '#6B21D8', accentText: '#FFFFFF', border: '#8C6D1F', slices: ['#2A1347', '#1F0F33'], wheel: ['#6D28D9', '#3B0764', '#8B5CF6', '#4C1D95'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold', locked: true },
 };
 
-// Slot machine tile icons. A reward without a chosen symbol gets one by its position.
-export const SLOT_SYMBOLS = ['🍒', '🍋', '🔔', '⭐', '💎', '7️⃣', '🍀', '🎁', '🍇', '👑'];
+// Slot machine tile icons, picked per reward in the dashboard. A reward without one gets an icon by its position.
+export const SLOT_ICONS = [
+  { key: 'diamond', label: 'Diamond', glyph: '💎' },
+  { key: 'star', label: 'Star', glyph: '⭐' },
+  { key: 'lightning', label: 'Lightning', glyph: '⚡' },
+  { key: 'cherry', label: 'Cherry', glyph: '🍒' },
+  { key: 'lemon', label: 'Lemon', glyph: '🍋' },
+  { key: 'grapes', label: 'Grapes', glyph: '🍇' },
+  { key: 'watermelon', label: 'Watermelon', glyph: '🍉' },
+  { key: 'orange', label: 'Orange', glyph: '🍊' },
+  { key: 'strawberry', label: 'Strawberry', glyph: '🍓' },
+  { key: 'seven', label: 'Lucky 7', glyph: '7️⃣' },
+  { key: 'bell', label: 'Bell', glyph: '🔔' },
+  { key: 'clover', label: 'Clover', glyph: '🍀' },
+  { key: 'crown', label: 'Crown', glyph: '👑' },
+];
+export const SLOT_SYMBOLS = SLOT_ICONS.map((i) => i.glyph);
 export const symbolFor = (reward, index) => reward.symbol || SLOT_SYMBOLS[index % SLOT_SYMBOLS.length];
 
 export const DEFAULT_THEME = 'emerald';
