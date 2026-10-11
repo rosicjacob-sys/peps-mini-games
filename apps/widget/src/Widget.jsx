@@ -17,6 +17,8 @@ function cssVars(game) {
     '--bg': th.bg, '--surface': th.surface, '--text': th.text, '--muted': th.muted,
     '--accent': accent, '--accent-text': game.brandAccent && !GAME_TYPES[game.type]?.fixedTheme ? '#fff' : th.accentText, '--border': th.border,
     '--rim': rim, '--rim-text': th.rimText || th.accentText,
+    // the trigger's spade: gold on a coloured button, button-text colour when the button itself is gold
+    '--suit': accent.toLowerCase() === String(rim).toLowerCase() ? (th.accentText || '#1f1a0a') : rim,
     // headline fill: gold leaf on the casino theme, the rim colour elsewhere
     '--marquee': gold ? 'linear-gradient(180deg,#fff6c8 0%,#f1d57a 35%,#b8891f 55%,#ffe79a 80%,#d6b24a 100%)' : `linear-gradient(${rim},${rim})`,
   };
