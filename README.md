@@ -63,4 +63,4 @@ npm run dev:widget     # :5174  → /?store=<public_key>&api=http://localhost:30
 ## Roadmap
 - [x] API, dashboard, wheel, EN/FR, weekly limit, Resend, CSV export
 - [x] Slot machine (one payline; all three reels stop on the winning reward's symbol)
-- [x] Blackjack (hit/stand, fixed purple theme; each reward has a "hand result"; the server deals so every hit/stand path ends in that result)
+- [x] Blackjack (the player wins a warm-up hand with hit/stand, then spins the wheel that decides the reward; fixed purple theme)

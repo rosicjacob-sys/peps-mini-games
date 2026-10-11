@@ -44,7 +44,7 @@ export const UI = {
     already: 'You already played this week.', comeBack: 'Come back on', error: 'Something went wrong. Please try again.',
     paused: 'This game is not available right now.',
     hit: 'Hit', stand: 'Stand', dealer: 'Dealer', you: 'You', bust: 'Bust!',
-    bjResult: { blackjack: 'Blackjack!', win: 'You win!', push: 'Push', loss: 'Dealer wins' }, bjNext: 'Collect reward',
+    bjResult: { blackjack: 'Blackjack!', win: 'You win!', push: 'Push', loss: 'Dealer wins' }, bjNext: 'Spin for your reward',
   },
   fr: {
     play: 'Jouer et gagner', emailLabel: 'Votre courriel', emailPlaceholder: 'vous@exemple.com',
@@ -55,7 +55,7 @@ export const UI = {
     already: 'Vous avez déjà joué cette semaine.', comeBack: 'Revenez le', error: 'Une erreur est survenue. Veuillez réessayer.',
     paused: "Ce jeu n'est pas disponible pour le moment.",
     hit: 'Carte', stand: 'Rester', dealer: 'Croupier', you: 'Vous', bust: 'Dépassé!',
-    bjResult: { blackjack: 'Blackjack!', win: 'Vous gagnez!', push: 'Égalité', loss: 'Le croupier gagne' }, bjNext: 'Récupérer ma récompense',
+    bjResult: { blackjack: 'Blackjack!', win: 'Vous gagnez!', push: 'Égalité', loss: 'Le croupier gagne' }, bjNext: 'Tourner pour ma récompense',
   },
 };
 

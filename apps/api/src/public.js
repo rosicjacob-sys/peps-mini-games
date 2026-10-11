@@ -86,8 +86,9 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
   res.json({
     email: mail.email,
     rewards: picks.map((r) => ({ id: r.id, title: r.title, subtitle: r.subtitle, symbol: r.symbol, code: r.code })),
-    // the hand is dealt so it ends in this reward's configured result, whatever the player does
-    ...(game.type === 'blackjack' ? { script: buildScript(picks[0].outcome || 'win', secureRandom) } : {}),
+    // blackjack: the hand is a warm-up the player always wins (a natural 21 one time in five); the wheel
+    // that follows decides the reward, so the reward odds are the only thing that matters
+    ...(game.type === 'blackjack' ? { script: buildScript(secureRandom() < 0.2 ? 'blackjack' : 'win', secureRandom) } : {}),
     expiresAt: week.expiresAt,
     expiresText: formatExpiry(week.expiresAt, locale),
   });

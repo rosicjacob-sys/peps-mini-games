@@ -5,7 +5,8 @@ import Blackjack from './games/Blackjack.jsx';
 import Slots from './games/Slots.jsx';
 import Confetti from './Confetti.jsx';
 
-const GAMES = { wheel: Wheel, blackjack: Blackjack, slots: Slots };
+// Stages a play goes through before the result screen. Blackjack is a warm-up hand, then the wheel decides the reward.
+const GAMES = { wheel: [Wheel], blackjack: [Blackjack, Wheel], slots: [Slots] };
 
 function cssVars(game) {
   const th = themeFor(game.type, game.theme);
@@ -151,7 +152,8 @@ function Intro({ game, locale, setLocale, onPlay, onDecline }) {
 
 function Play({ game, api, store, locale, onClose }) {
   const ui = UI[locale];
-  const Game = GAMES[game.type];
+  const stages = GAMES[game.type];
+  const [stage, setStage] = useState(0);
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -198,7 +200,11 @@ function Play({ game, api, store, locale, onClose }) {
     );
   }
 
-  if (!done) return <div className="screen"><h2>{heading}</h2><Game game={game} result={result} locale={locale} onDone={() => setDone(true)} /></div>;
+  if (!done) {
+    const Stage = stages[stage];
+    const next = () => (stage + 1 < stages.length ? setStage(stage + 1) : setDone(true));
+    return <div className="screen"><h2>{heading}</h2><Stage key={stage} game={game} result={result} locale={locale} onDone={next} /></div>;
+  }
 
   return (
     <div className="screen result">
