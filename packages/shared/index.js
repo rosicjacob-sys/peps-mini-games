@@ -22,7 +22,17 @@ export const THEMES = {
   'black-gold': { label: 'Black & gold', bg: '#0D0D0F', surface: '#17171B', text: '#FFF8E7', muted: '#B5B5BD', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#1F1F24', '#121215'], wheel: ['#2A2A30', '#101012', '#3A3A42', '#1B1B1F'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
   'royal-blue': { label: 'Royal blue',  bg: '#0B1F4D', surface: '#102A66', text: '#FFF8E7', muted: '#A9BBE6', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#143A8A', '#0B1F4D'], wheel: ['#1C4AA8', '#141414', '#143A8A', '#2A2A2A'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
   'crimson':  { label: 'Crimson',       bg: '#5A0E0E', surface: '#6E1414', text: '#FFF4E6', muted: '#F0B9B9', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#8A1C1C', '#5A0E0E'], wheel: ['#A32424', '#141414', '#8A1C1C', '#2A2A2A'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
+  'teal':     { label: 'Midnight teal', bg: '#062B30', surface: '#0A3A41', text: '#FFF8E7', muted: '#9ED3D6', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#0E5A63', '#062B30'], wheel: ['#0F6670', '#141414', '#0B4F57', '#2A2A2A'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
+  'copper':   { label: 'Copper & onyx', bg: '#120C0A', surface: '#1E1410', text: '#FFF4EA', muted: '#D9B9A5', accent: '#D08A5C', accentText: '#1f1209', border: '#7A4527', slices: ['#3A2116', '#1E1410'], wheel: ['#8A4426', '#141414', '#A85A34', '#2A2A2A'], rim: '#D08A5C', rimText: '#1f1209', marquee: 'copper' },
+  'platinum': { label: 'Platinum VIP',  bg: '#0F1319', surface: '#181E27', text: '#F5F7FA', muted: '#AEB7C5', accent: '#C9CFD8', accentText: '#14171C', border: '#6B7280', slices: ['#2A3240', '#181E27'], wheel: ['#33405A', '#121418', '#4A5873', '#22262E'], rim: '#C9CFD8', rimText: '#14171C', marquee: 'silver' },
   'casino-purple': { label: 'Casino purple', bg: '#14081F', surface: '#1F0F33', text: '#FFFFFF', muted: '#C4B5FD', accent: '#6B21D8', accentText: '#FFFFFF', border: '#8C6D1F', slices: ['#2A1347', '#1F0F33'], wheel: ['#6D28D9', '#141414', '#8B5CF6', '#2A2A2A'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold', locked: true },
+};
+
+// polished-metal fills for headline text, by the theme's `marquee` metal
+export const METALS = {
+  gold: 'linear-gradient(180deg,#fff6c8 0%,#f1d57a 35%,#b8891f 55%,#ffe79a 80%,#d6b24a 100%)',
+  copper: 'linear-gradient(180deg,#ffe6d4 0%,#f2ad80 35%,#9a4c24 55%,#ffcaa3 80%,#cf8456 100%)',
+  silver: 'linear-gradient(180deg,#ffffff 0%,#e4e8ee 35%,#8a93a2 55%,#f5f7fa 80%,#bcc3cf 100%)',
 };
 
 // Slot machine tile icons, picked per reward in the dashboard. A reward without one gets an icon by its position.

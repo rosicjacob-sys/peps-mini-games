@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { UI, INTRO_DEFAULTS, LOCALES, pickLocale, t, themeFor, GAME_TYPES } from '@peps/shared';
+import { UI, INTRO_DEFAULTS, LOCALES, pickLocale, t, themeFor, GAME_TYPES, METALS } from '@peps/shared';
 import Wheel from './games/Wheel.jsx';
 import Blackjack from './games/Blackjack.jsx';
 import Slots from './games/Slots.jsx';
@@ -17,15 +17,14 @@ function cssVars(game) {
   const th = themeFor(game.type, game.theme);
   const accent = (!GAME_TYPES[game.type]?.fixedTheme && game.brandAccent) || th.accent;
   const rim = th.rim || accent;
-  const gold = th.marquee === 'gold';
   return {
     '--bg': th.bg, '--surface': th.surface, '--text': th.text, '--muted': th.muted,
     '--accent': accent, '--accent-text': game.brandAccent && !GAME_TYPES[game.type]?.fixedTheme ? '#fff' : th.accentText, '--border': th.border,
     '--rim': rim, '--rim-text': th.rimText || th.accentText,
     // the trigger's spade: gold on a coloured button, button-text colour when the button itself is gold
     '--suit': accent.toLowerCase() === String(rim).toLowerCase() ? (th.accentText || '#1f1a0a') : rim,
-    // headline fill: gold leaf on the casino theme, the rim colour elsewhere
-    '--marquee': gold ? 'linear-gradient(180deg,#fff6c8 0%,#f1d57a 35%,#b8891f 55%,#ffe79a 80%,#d6b24a 100%)' : `linear-gradient(${rim},${rim})`,
+    // headline fill: the theme's polished metal (gold, copper or silver), else the flat rim colour
+    '--marquee': METALS[th.marquee] || `linear-gradient(${rim},${rim})`,
   };
 }
 
