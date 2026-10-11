@@ -67,3 +67,6 @@ ALTER TABLE rewards ADD COLUMN IF NOT EXISTS outcome text;
 
 -- slots: the symbol shown on the reels for this reward
 ALTER TABLE rewards ADD COLUMN IF NOT EXISTS symbol text;
+
+-- internal test emails: not counted in stats or exports
+ALTER TABLE plays ADD COLUMN IF NOT EXISTS is_test boolean NOT NULL DEFAULT false;

@@ -33,21 +33,43 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 22px; f
 .copy { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .wheel { transition-duration: 1s !important; } }
 
-/* blackjack */
+/* blackjack — a real table: wooden rail, purple felt, gold racetrack, shoe and chips */
 .bj { display: flex; flex-direction: column; gap: 14px; align-items: stretch; }
-.bj-table { background: radial-gradient(ellipse at 50% 30%, #3b1b66 0%, #1f0f33 75%); border: 1px solid var(--border); border-radius: 16px; padding: 14px 10px; display: flex; flex-direction: column; gap: 18px; min-height: 270px; justify-content: space-around; box-shadow: inset 0 0 40px rgba(0,0,0,.45); }
-.bj-row { display: flex; flex-direction: column; gap: 8px; align-items: center; }
-.bj-label { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.bj-label b { color: #fff; font-size: 15px; margin-left: 4px; }
-.bj-cards { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; min-height: 84px; }
-.bj-card { position: relative; width: 56px; height: 80px; border-radius: 8px; background: #fff; color: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 800; box-shadow: 0 4px 10px rgba(0,0,0,.45); animation: deal .35s ease-out both; }
-.bj-card .r { font-size: 22px; line-height: 1; } .bj-card .s { font-size: 24px; line-height: 1.1; }
-.bj-card.red { color: #d11a2a; }
-.bj-card.back { background: repeating-linear-gradient(45deg, #6b21d8 0 6px, #4c14a3 6px 12px); border: 3px solid #fff; }
+.bj-table { padding: 9px; border-radius: 26px 26px 190px 190px / 26px 26px 150px 150px;
+  background: linear-gradient(180deg, #6b4423 0%, #3d2410 45%, #5a3719 100%);
+  box-shadow: 0 14px 30px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.18), inset 0 -2px 4px rgba(0,0,0,.5); }
+.bj-felt { position: relative; min-height: 300px; padding: 16px 12px 34px; display: flex; flex-direction: column; justify-content: space-between; gap: 6px;
+  border-radius: 20px 20px 182px 182px / 20px 20px 142px 142px;
+  background:
+    repeating-linear-gradient(45deg, rgba(255,255,255,.025) 0 2px, transparent 2px 5px),
+    radial-gradient(ellipse at 50% 15%, #5b2aa0 0%, #3a1a6e 45%, #230d45 100%);
+  box-shadow: inset 0 0 0 2px rgba(214,178,74,.55), inset 0 0 0 4px rgba(0,0,0,.25), inset 0 0 60px rgba(0,0,0,.55); overflow: hidden; }
+.bj-felt::before { content: ""; position: absolute; inset: 12px 12px 14px; border: 1px solid rgba(214,178,74,.35); border-radius: 12px 12px 170px 170px / 12px 12px 130px 130px; pointer-events: none; }
+.bj-row { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.bj-label { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: rgba(214,178,74,.9); font-weight: 700; }
+.bj-label b { color: #fff; font-size: 15px; margin-left: 5px; letter-spacing: 0; }
+.bj-cards { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; min-height: 84px; }
+.bj-card { position: relative; width: 58px; height: 82px; border-radius: 7px; color: #111; background: linear-gradient(160deg, #fff 0%, #f1f1f3 100%);
+  box-shadow: 0 6px 12px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.6) inset; animation: deal .45s cubic-bezier(.2,.8,.3,1) both; }
+.bj-card .ci { position: absolute; font-size: 12px; font-weight: 800; line-height: 1; display: flex; flex-direction: column; align-items: center; }
+.bj-card .ci i { font-style: normal; font-size: 11px; margin-top: 1px; }
+.bj-card .tl { top: 5px; left: 5px; } .bj-card .br { bottom: 5px; right: 5px; transform: rotate(180deg); }
+.bj-card .cs { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+.bj-card.red { color: #c81e2e; }
+.bj-card.back { background: repeating-linear-gradient(45deg, #6b21d8 0 5px, #4c14a3 5px 10px); border: 3px solid #f4f4f4; box-shadow: 0 6px 12px rgba(0,0,0,.5), inset 0 0 0 1px rgba(214,178,74,.8); }
+.bj-arc { width: 100%; height: 44px; margin: -6px 0; opacity: .9; }
+.bj-arc text { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; fill: rgba(214,178,74,.85); }
+.bj-shoe { position: absolute; top: 12px; right: 14px; width: 34px; height: 48px; }
+.bj-shoe i { position: absolute; inset: 0; border-radius: 4px; background: repeating-linear-gradient(45deg, #6b21d8 0 4px, #4c14a3 4px 8px); border: 2px solid #f4f4f4; box-shadow: 0 2px 4px rgba(0,0,0,.5); }
+.bj-shoe i:nth-child(2) { transform: translate(-3px, 3px) rotate(-6deg); } .bj-shoe i:nth-child(3) { transform: translate(-6px, 6px) rotate(-12deg); }
+.bj-chips { position: absolute; left: 18px; bottom: 44px; width: 36px; height: 36px; }
+.bj-chips i { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, #d6b24a 0 32%, #a3832a 33% 100%); border: 4px dashed #fff5d6; box-sizing: border-box; box-shadow: 0 2px 3px rgba(0,0,0,.6); }
+.bj-chips i:nth-child(2) { transform: translateY(-5px); } .bj-chips i:nth-child(3) { transform: translateY(-10px); background: radial-gradient(circle, #8b5cf6 0 32%, #5b21b6 33% 100%); }
 .bj-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.bj-result { text-align: center; font-size: 24px; font-weight: 800; }
-.bj-result.blackjack, .bj-result.win { color: #8b5cf6; }
-@keyframes deal { from { opacity: 0; transform: translateY(-14px) scale(.9); } to { opacity: 1; transform: none; } }
+.bj-actions .btn { border: 1px solid rgba(214,178,74,.75); box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+.bj-result { text-align: center; font-size: 26px; font-weight: 800; letter-spacing: .02em; }
+.bj-result.blackjack, .bj-result.win { color: #e6c35c; text-shadow: 0 0 18px rgba(230,195,92,.45); }
+@keyframes deal { from { opacity: 0; transform: translate(130px, -110px) rotate(18deg); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .bj-card { animation: none; } }
 
 /* slots */

@@ -53,7 +53,7 @@ adminRouter.delete('/stores/:id', wrap(async (req, res) => { await q('DELETE FRO
 adminRouter.get('/games', wrap(async (req, res) => {
   const { rows } = await q(`
     SELECT g.*, s.name AS store_name, s.public_key,
-      (SELECT count(*)::int FROM plays p WHERE p.game_id = g.id) AS play_count
+      (SELECT count(*)::int FROM plays p WHERE p.game_id = g.id AND NOT p.is_test) AS play_count
     FROM games g JOIN stores s ON s.id = g.store_id
     WHERE ($1::uuid IS NULL OR g.store_id = $1) ORDER BY s.name, g.created_at`, [req.query.store_id || null]);
   res.json(rows);
@@ -131,13 +131,13 @@ adminRouter.get('/games/:id/stats', wrap(async (req, res) => {
   const [{ rows: [t] }, { rows: tally }, { rows: byDay }] = await Promise.all([
     q(`SELECT count(*)::int AS plays, count(DISTINCT email_norm)::int AS players,
          count(*) FILTER (WHERE created_at >= now() - interval '7 days')::int AS plays_7d,
-         count(*) FILTER (WHERE email_status = 'failed')::int AS email_failed FROM plays WHERE game_id = $1`, [id]),
+         count(*) FILTER (WHERE email_status = 'failed')::int AS email_failed FROM plays WHERE game_id = $1 AND NOT is_test`, [id]),
     q(`SELECT pr.reward_id, (array_agg(pr.title ORDER BY p.created_at DESC))[1] AS title, (array_agg(pr.code ORDER BY p.created_at DESC))[1] AS code,
          count(*)::int AS won, count(DISTINCT p.email_norm)::int AS players
-       FROM play_rewards pr JOIN plays p ON p.id = pr.play_id WHERE pr.game_id = $1
+       FROM play_rewards pr JOIN plays p ON p.id = pr.play_id WHERE pr.game_id = $1 AND NOT p.is_test
        GROUP BY pr.reward_id ORDER BY won DESC`, [id]),
     q(`SELECT to_char(date_trunc('day', created_at AT TIME ZONE 'America/Toronto'), 'YYYY-MM-DD') AS day, count(*)::int AS plays
-       FROM plays WHERE game_id = $1 AND created_at >= now() - interval '30 days' GROUP BY 1 ORDER BY 1`, [id]),
+       FROM plays WHERE game_id = $1 AND NOT is_test AND created_at >= now() - interval '30 days' GROUP BY 1 ORDER BY 1`, [id]),
   ]);
   res.json({ ...t, tally, byDay });
 }));
@@ -147,7 +147,7 @@ adminRouter.get('/games/:id/plays', wrap(async (req, res) => {
   const { rows } = await q(`
     SELECT p.id, p.email, p.created_at, p.email_status, p.locale, pr.reward_id, pr.title, pr.code
     FROM plays p JOIN play_rewards pr ON pr.play_id = p.id
-    WHERE p.game_id = $1 AND ($2::uuid IS NULL OR pr.reward_id = $2)
+    WHERE p.game_id = $1 AND NOT p.is_test AND ($2::uuid IS NULL OR pr.reward_id = $2)
     ORDER BY p.created_at DESC LIMIT $3 OFFSET $4`,
     [req.params.id, req.query.reward_id || null, Math.min(500, parseInt(req.query.limit, 10) || 100), parseInt(req.query.offset, 10) || 0]);
   res.json(rows);
@@ -161,7 +161,7 @@ adminRouter.get('/games/:id/export.csv', wrap(async (req, res) => {
   const { rows } = await q(`
     SELECT p.email, p.locale, p.created_at, g.name AS game, s.name AS store, pr.title, pr.code
     FROM plays p JOIN play_rewards pr ON pr.play_id = p.id JOIN games g ON g.id = p.game_id JOIN stores s ON s.id = g.store_id
-    WHERE ($1::boolean OR p.game_id = $2::uuid) AND ($3::uuid IS NULL OR pr.reward_id = $3)
+    WHERE NOT p.is_test AND ($1::boolean OR p.game_id = $2::uuid) AND ($3::uuid IS NULL OR pr.reward_id = $3)
     ORDER BY p.created_at DESC`, [all, all ? null : req.params.id, req.query.reward_id || null]);
   const head = 'email,store,game,reward,code,language,played_at';
   const body = rows.map((r) => [r.email, r.store, r.game, r.title?.en, r.code, r.locale, r.created_at.toISOString()].map(csvCell).join(','));

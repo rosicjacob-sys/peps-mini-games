@@ -4,7 +4,8 @@ import rateLimit from 'express-rate-limit';
 import { pickLocale, GAME_TYPES } from '@peps/shared';
 import { buildScript } from '@peps/shared/blackjack.js';
 import { q, pool } from './db.js';
-import { weekInfo, normalizeEmail, pickRewards, hashIp, formatExpiry, secureRandom } from './lib.js';
+import { weekInfo, normalizeEmail, pickRewards, hashIp, formatExpiry, secureRandom, isTestEmail } from './lib.js';
+import crypto from 'node:crypto';
 import { buildEmail, sendEmail } from './email.js';
 
 export const publicRouter = Router();
@@ -57,14 +58,17 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
   if (!picks.length) return res.status(409).json({ error: 'game_unavailable' });
 
   const week = weekInfo();
+  const test = isTestEmail(mail.norm);
+  // a test email gets a unique week key so the one-play-per-week constraint never blocks it
+  const weekKey = test ? `${week.weekKey}/test-${crypto.randomUUID()}` : week.weekKey;
   const client = await pool.connect();
   let playId;
   try {
     await client.query('BEGIN');
     const ins = await client.query(
-      `INSERT INTO plays (game_id, email, email_norm, week_key, locale, ip_hash)
-       VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (game_id, email_norm, week_key) DO NOTHING RETURNING id`,
-      [game.id, mail.email, mail.norm, week.weekKey, locale, hashIp(req.ip)]);
+      `INSERT INTO plays (game_id, email, email_norm, week_key, locale, ip_hash, is_test)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (game_id, email_norm, week_key) DO NOTHING RETURNING id`,
+      [game.id, mail.email, mail.norm, weekKey, locale, hashIp(req.ip), test]);
     if (!ins.rowCount) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'already_played', nextPlayAt: week.nextPlayAt }); }
     playId = ins.rows[0].id;
     for (const r of picks) {
@@ -85,6 +89,7 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
 
   res.json({
     email: mail.email,
+    ...(test ? { test: true } : {}),
     rewards: picks.map((r) => ({ id: r.id, title: r.title, subtitle: r.subtitle, symbol: r.symbol, code: r.code })),
     // blackjack: the hand is a warm-up the player always wins (a natural 21 one time in five); the wheel
     // that follows decides the reward, so the reward odds are the only thing that matters
