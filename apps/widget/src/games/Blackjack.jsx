@@ -1,0 +1,86 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { UI } from '@peps/shared';
+import { handValue, canHit, playRound, isBlackjack } from '@peps/shared/blackjack.js';
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function Card({ c, hidden, delay = 0 }) {
+  if (hidden) return <div className="bj-card back" style={{ animationDelay: `${delay}ms` }} />;
+  const red = c.s === '♥' || c.s === '♦';
+  return (
+    <div className={`bj-card ${red ? 'red' : ''}`} style={{ animationDelay: `${delay}ms` }}>
+      <span className="r">{c.r}</span><span className="s">{c.s}</span>
+    </div>
+  );
+}
+
+// The server dealt a script that ends in the decided result whatever the player picks.
+// Here the player just chooses hit/stand; the dealer plays out from the server's cards.
+export default function Blackjack({ result, locale, onDone }) {
+  const ui = UI[locale];
+  const script = result.script;
+  const [hits, setHits] = useState(0);
+  const [phase, setPhase] = useState('player');    // player | dealer | done
+  const [dealer, setDealer] = useState([script.dealerUp]);
+  const [hole, setHole] = useState(false);          // hole card face-up?
+  const [outcome, setOutcome] = useState(null);
+  const [bust, setBust] = useState(false);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
+
+  const player = [...script.player, ...script.playerDraws.slice(0, hits)];
+  const pv = handValue(player);
+
+  async function finish(h) {
+    setPhase('dealer');
+    const round = playRound(script, h);
+    await wait(500);
+    setDealer(round.dealer.slice(0, 2)); setHole(true);
+    for (let i = 2; i < round.dealer.length; i++) { await wait(750); if (!alive.current) return; setDealer(round.dealer.slice(0, i + 1)); }
+    await wait(600); if (!alive.current) return;
+    setBust(!!round.bust);
+    // `script.target` is what the server decided; the engine guarantees round.outcome === target.
+    setOutcome(script.target); setPhase('done');
+  }
+
+  // naturals resolve themselves
+  useEffect(() => { if (isBlackjack(script.player)) { const id = setTimeout(() => finish(0), 900); return () => clearTimeout(id); } }, []);
+
+  function hit() {
+    if (phase !== 'player' || !canHit(script, hits)) return;
+    const h = hits + 1; setHits(h);
+    const v = handValue([...script.player, ...script.playerDraws.slice(0, h)]);
+    if (v >= 21) setTimeout(() => finish(h), 700);
+  }
+
+  const natural = isBlackjack(script.player);
+
+  return (
+    <div className="bj">
+      <div className="bj-table">
+        <div className="bj-row">
+          <div className="bj-label">{ui.dealer} {hole ? <b>{handValue(dealer)}</b> : null}</div>
+          <div className="bj-cards">
+            <Card c={dealer[0]} />
+            {hole ? dealer.slice(1).map((c, i) => <Card key={i} c={c} />) : <Card hidden />}
+          </div>
+        </div>
+        <div className="bj-row">
+          <div className="bj-cards">{player.map((c, i) => <Card key={i} c={c} delay={i >= script.player.length ? 0 : i * 120} />)}</div>
+          <div className="bj-label">{ui.you} <b>{pv}</b>{bust || pv > 21 ? ` — ${ui.bust}` : ''}</div>
+        </div>
+      </div>
+      {phase === 'done' ? (
+        <>
+          <div className={`bj-result ${outcome}`}>{ui.bjResult[outcome]}</div>
+          <button className="btn" onClick={onDone}>{ui.bjNext}</button>
+        </>
+      ) : (
+        <div className="bj-actions">
+          <button className="btn" disabled={phase !== 'player' || natural || !canHit(script, hits)} onClick={hit}>{ui.hit}</button>
+          <button className="btn ghost" disabled={phase !== 'player' || natural} onClick={() => finish(hits)}>{ui.stand}</button>
+        </div>
+      )}
+    </div>
+  );
+}
