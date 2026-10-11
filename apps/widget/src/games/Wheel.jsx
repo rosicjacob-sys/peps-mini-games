@@ -3,8 +3,8 @@ import { UI, t, themeFor } from '@peps/shared';
 
 const R = 150;
 const polar = (deg, r) => { const a = ((deg - 90) * Math.PI) / 180; return [R + r * Math.cos(a), R + r * Math.sin(a)]; };
-const CHAR = 0.58;          // bold sans glyph width ≈ 0.58 × font size
-const AVAIL = R * 0.66;     // radial room for a label
+const CHAR = 0.63;          // bold sans glyph width ≈ 0.63 × font size (capitals are wide)
+const AVAIL = R * 0.6;      // radial room for a label, clear of the hub and the rim
 
 // Wrap a label onto up to `maxLines` lines, shrinking the font from 14 to 9 until it fits; ellipsize as a last resort.
 function layoutLabel(text, maxLines) {
@@ -40,6 +40,7 @@ export default function Wheel({ game, result, locale, onDone }) {
   const [rot, setRot] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [spin, setSpin] = useState(0);
+  const [wonId, setWonId] = useState(null);
   const rotRef = useRef(0);
   const spinningRef = useRef(false);
   const timer = useRef();
@@ -68,28 +69,41 @@ export default function Wheel({ game, result, locale, onDone }) {
     spinningRef.current = false;
     clearTimeout(timer.current);
     setSpinning(false);
-    if (spin + 1 >= result.rewards.length) setTimeout(onDone, 700);
+    setWonId(result.rewards[spin].id);
+    if (spin + 1 >= result.rewards.length) setTimeout(onDone, 1400);
     else setSpin(spin + 1);
   }
 
+  const rim = th.rim || th.accent;
+  const tones = th.wheel || th.slices;
+  const pegs = Math.max(16, n * 4);
+
   return (
     <div className="wheel-wrap">
-      <div className="pointer" aria-hidden="true" />
+      <svg className="pointer" viewBox="0 0 40 52" aria-hidden="true">
+        <path d="M20,50 L4,10 Q20,-6 36,10 Z" fill={rim} stroke="rgba(0,0,0,.45)" strokeWidth="1.5" />
+        <circle cx="20" cy="12" r="4.5" fill="rgba(255,255,255,.55)" />
+      </svg>
       <div className="wheel-box">
       <svg viewBox={`0 0 ${R * 2} ${R * 2}`} className="wheel" role="img" aria-label="Prize wheel"
         style={{ transform: `rotate(${rot}deg)`, transition: spinning ? 'transform 5s cubic-bezier(.12,.6,.1,1)' : 'none' }}
         onTransitionEnd={ended}>
+        <defs>
+          <radialGradient id="pg-gloss" cx="35%" cy="30%" r="70%"><stop offset="0%" stopColor="#fff" stopOpacity=".22" /><stop offset="60%" stopColor="#fff" stopOpacity="0" /></radialGradient>
+          <radialGradient id="pg-edge" cx="50%" cy="50%" r="50%"><stop offset="80%" stopColor="#000" stopOpacity="0" /><stop offset="100%" stopColor="#000" stopOpacity=".35" /></radialGradient>
+          <radialGradient id="pg-hub" cx="40%" cy="35%" r="70%"><stop offset="0%" stopColor="#fff" stopOpacity=".35" /><stop offset="100%" stopColor="#000" stopOpacity=".25" /></radialGradient>
+        </defs>
         {game.rewards.map((r, i) => {
           const a0 = i * step, a1 = (i + 1) * step;
-          const [x0, y0] = polar(a0, R - 4), [x1, y1] = polar(a1, R - 4);
-          const fill = n % 2 && i === n - 1 ? th.border : th.slices[i % 2];
+          const [x0, y0] = polar(a0, R - 7), [x1, y1] = polar(a1, R - 7);
+          const fill = tones[(n % tones.length === 1 && i === n - 1) ? 1 : i % tones.length];
           const mid = a0 + step / 2;
-          const [tx, ty] = polar(mid, R * 0.6);
+          const [tx, ty] = polar(mid, R * 0.57);
           const { lines, f } = layoutLabel(t(r.title, locale), maxLines);
           return (
-            <g key={r.id}>
-              {n === 1 ? <circle cx={R} cy={R} r={R - 4} fill={fill} stroke={th.border} strokeWidth="1.5" />
-                : <path d={`M${R},${R} L${x0},${y0} A${R - 4},${R - 4} 0 ${step > 180 ? 1 : 0} 1 ${x1},${y1} Z`} fill={fill} stroke={th.border} strokeWidth="1.5" />}
+            <g key={r.id} className={r.id === wonId ? 'slice won' : 'slice'}>
+              {n === 1 ? <circle cx={R} cy={R} r={R - 7} fill={fill} stroke={rim} strokeWidth="1.5" />
+                : <path d={`M${R},${R} L${x0},${y0} A${R - 7},${R - 7} 0 ${step > 180 ? 1 : 0} 1 ${x1},${y1} Z`} fill={fill} stroke={rim} strokeWidth="1.5" strokeOpacity=".8" />}
               <text x={tx} y={ty} fill={th.text} fontSize={f} fontWeight="700" textAnchor="middle" dominantBaseline="middle"
                 transform={`rotate(${mid - 90} ${tx} ${ty})`}>
                 {lines.map((l, j) => <tspan key={j} x={tx} dy={j === 0 ? `${-(lines.length - 1) * 0.55}em` : '1.1em'}>{l}</tspan>)}
@@ -97,7 +111,17 @@ export default function Wheel({ game, result, locale, onDone }) {
             </g>
           );
         })}
-        <circle cx={R} cy={R} r="22" fill="var(--accent)" stroke={th.border} strokeWidth="2" />
+        <circle cx={R} cy={R} r={R - 7} fill="url(#pg-gloss)" pointerEvents="none" />
+        <circle cx={R} cy={R} r={R - 7} fill="url(#pg-edge)" pointerEvents="none" />
+        {/* rim + pegs */}
+        <circle cx={R} cy={R} r={R - 4} fill="none" stroke={rim} strokeWidth="7" />
+        <circle cx={R} cy={R} r={R - 1} fill="none" stroke="rgba(0,0,0,.35)" strokeWidth="1.5" />
+        {Array.from({ length: pegs }, (_, i) => { const [px, py] = polar((360 / pegs) * i, R - 4); return <g key={i}><circle cx={px} cy={py} r="3.2" fill={rim} stroke="rgba(0,0,0,.35)" strokeWidth=".8" /><circle cx={px - 0.9} cy={py - 0.9} r="1.1" fill="rgba(255,255,255,.7)" /></g>; })}
+        {/* hub */}
+        <circle cx={R} cy={R} r="28" fill="rgba(0,0,0,.35)" transform="translate(0 2)" />
+        <circle cx={R} cy={R} r="27" fill="var(--accent)" stroke={rim} strokeWidth="4" />
+        <circle cx={R} cy={R} r="27" fill="url(#pg-hub)" />
+        <circle cx={R} cy={R} r="9" fill={rim} /><circle cx={R - 3} cy={R - 3} r="3" fill="rgba(255,255,255,.6)" />
       </svg>
       </div>
       <button className="btn" disabled={spinning} onClick={go}>{spinning ? ui.spinning : result.rewards.length > 1 ? `${ui.spin} (${spin + 1}/${result.rewards.length})` : ui.spin}</button>
