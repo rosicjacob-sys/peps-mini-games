@@ -4,23 +4,38 @@ export const LOCALES = ['en', 'fr'];
 
 export const GAME_TYPES = {
   blackjack: { label: 'Blackjack', icon: '♠', fixedTheme: 'casino-purple' },
-  wheel: { label: 'Prize Wheel', icon: '🎡' },
-  slots: { label: 'Slot Machine', icon: '🎰' },
+  wheel: { label: 'Prize Wheel', icon: '🎡', defaultTheme: 'burgundy' },
+  slots: { label: 'Slot Machine', icon: '🎰', defaultTheme: 'emerald' },
 };
 
 // Casino palettes. Every theme carries gold trim (rim); the accent is the button colour.
 // `brandAccent` on a game can still override `accent` if a client wants their colour on the buttons.
 export const THEMES = {
-  'emerald':  { label: 'Emerald felt',  bg: '#0B3D2E', surface: '#0F4D3A', text: '#FFF8E7', muted: '#A7D7C3', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#0F5C44', '#083B2C'], wheel: ['#0F5C44', '#083B2C', '#146B50', '#0A4A37'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
-  'burgundy': { label: 'Burgundy',      bg: '#3B0A12', surface: '#4A0F19', text: '#FFF4E6', muted: '#E6B8BF', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#5E1420', '#3B0A12'], wheel: ['#5E1420', '#3B0A12', '#7A1B2A', '#4A0F19'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
-  'black-gold': { label: 'Black & gold', bg: '#0D0D0F', surface: '#17171B', text: '#FFF8E7', muted: '#B5B5BD', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#1F1F24', '#121215'], wheel: ['#1F1F24', '#121215', '#2A2A30', '#18181C'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
-  'royal-blue': { label: 'Royal blue',  bg: '#0B1F4D', surface: '#102A66', text: '#FFF8E7', muted: '#A9BBE6', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#143A8A', '#0B1F4D'], wheel: ['#143A8A', '#0B1F4D', '#1C4AA8', '#10306E'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
-  'crimson':  { label: 'Crimson',       bg: '#5A0E0E', surface: '#6E1414', text: '#FFF4E6', muted: '#F0B9B9', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#8A1C1C', '#5A0E0E'], wheel: ['#8A1C1C', '#5A0E0E', '#A32424', '#701515'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
-  'casino-purple': { label: 'Casino purple', bg: '#14081F', surface: '#1F0F33', text: '#FFFFFF', muted: '#C4B5FD', accent: '#6B21D8', accentText: '#FFFFFF', border: '#8C6D1F', slices: ['#2A1347', '#1F0F33'], wheel: ['#6D28D9', '#3B0764', '#8B5CF6', '#4C1D95'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold', locked: true },
+  'emerald':  { label: 'Emerald felt',  bg: '#0B3D2E', surface: '#0F4D3A', text: '#FFF8E7', muted: '#A7D7C3', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#0F5C44', '#083B2C'], wheel: ['#146B50', '#141414', '#0F5C44', '#2A2A2A'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
+  'burgundy': { label: 'Burgundy',      bg: '#3B0A12', surface: '#4A0F19', text: '#FFF4E6', muted: '#E6B8BF', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#5E1420', '#3B0A12'], wheel: ['#7A1B2A', '#141414', '#A32434', '#2A2A2A'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
+  'black-gold': { label: 'Black & gold', bg: '#0D0D0F', surface: '#17171B', text: '#FFF8E7', muted: '#B5B5BD', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#1F1F24', '#121215'], wheel: ['#2A2A30', '#101012', '#3A3A42', '#1B1B1F'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
+  'royal-blue': { label: 'Royal blue',  bg: '#0B1F4D', surface: '#102A66', text: '#FFF8E7', muted: '#A9BBE6', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#143A8A', '#0B1F4D'], wheel: ['#1C4AA8', '#141414', '#143A8A', '#2A2A2A'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
+  'crimson':  { label: 'Crimson',       bg: '#5A0E0E', surface: '#6E1414', text: '#FFF4E6', muted: '#F0B9B9', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#8A1C1C', '#5A0E0E'], wheel: ['#A32424', '#141414', '#8A1C1C', '#2A2A2A'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
+  'casino-purple': { label: 'Casino purple', bg: '#14081F', surface: '#1F0F33', text: '#FFFFFF', muted: '#C4B5FD', accent: '#6B21D8', accentText: '#FFFFFF', border: '#8C6D1F', slices: ['#2A1347', '#1F0F33'], wheel: ['#6D28D9', '#141414', '#8B5CF6', '#2A2A2A'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold', locked: true },
 };
 
-// Slot machine tile icons. A reward without a chosen symbol gets one by its position.
-export const SLOT_SYMBOLS = ['🍒', '🍋', '🔔', '⭐', '💎', '7️⃣', '🍀', '🎁', '🍇', '👑'];
+// Slot machine tile icons, picked per reward in the dashboard. A reward without one gets an icon by its position.
+export const SLOT_ICONS = [
+  { key: 'diamond', label: 'Diamond', glyph: '💎' },
+  { key: 'star', label: 'Star', glyph: '⭐' },
+  { key: 'lightning', label: 'Lightning', glyph: '⚡' },
+  { key: 'cherry', label: 'Cherry', glyph: '🍒' },
+  { key: 'lemon', label: 'Lemon', glyph: '🍋' },
+  { key: 'grapes', label: 'Grapes', glyph: '🍇' },
+  { key: 'watermelon', label: 'Watermelon', glyph: '🍉' },
+  { key: 'orange', label: 'Orange', glyph: '🍊' },
+  { key: 'strawberry', label: 'Strawberry', glyph: '🍓' },
+  { key: 'seven', label: 'Lucky 7', glyph: '7️⃣' },
+  { key: 'bell', label: 'Bell', glyph: '🔔' },
+  { key: 'clover', label: 'Clover', glyph: '🍀' },
+  { key: 'crown', label: 'Crown', glyph: '👑' },
+];
+export const SLOT_SYMBOLS = SLOT_ICONS.map((i) => i.glyph);
 export const symbolFor = (reward, index) => reward.symbol || SLOT_SYMBOLS[index % SLOT_SYMBOLS.length];
 
 export const DEFAULT_THEME = 'emerald';
