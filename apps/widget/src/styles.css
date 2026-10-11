@@ -229,7 +229,6 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 22px; f
 /* the stacked edges: alternating light/grey lines down and to the right read as many cards */
 .deck .deck-body { background: #e9e9ec; box-shadow: 1px 1px 0 #cfcfd4, 2px 2px 0 #f2f2f4, 3px 3px 0 #c4c4ca, 4px 4px 0 #ececef, 5px 5px 0 #bdbdc4, 6px 6px 0 #e4e4e8, 7px 8px 12px rgba(0,0,0,.55); }
 .deck .deck-top { background: repeating-linear-gradient(45deg, #6b21d8 0 5px, #4c14a3 5px 10px); border: 3px solid #f6f6f6; box-shadow: inset 0 0 0 1px rgba(214,178,74,.75); }
-.deck .deck-top::after { content: "♠"; position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255,255,255,.85); font-size: 18px; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
 .deal-zone .deck.top-center { right: auto; left: 50%; top: 10px; transform: translateX(-50%) rotate(-7deg); }
 /* room for the deck */
 .poker-felt { padding-top: 92px; }
