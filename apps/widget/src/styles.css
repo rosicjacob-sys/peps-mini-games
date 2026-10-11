@@ -71,3 +71,10 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 22px; f
 .steps li { display: flex; gap: 10px; align-items: flex-start; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
 .steps li span { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-text); font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
 .modal > .screen:first-of-type, .modal > .picker { margin-top: 18px; }
+
+/* result celebration */
+.confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 2147483647; }
+.congrats { font-size: 28px; animation: pop .5s cubic-bezier(.2,1.6,.4,1) both; }
+.won { margin-top: -6px; }
+@keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .congrats { animation: none; } }

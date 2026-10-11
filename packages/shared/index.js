@@ -38,7 +38,7 @@ export const UI = {
   en: {
     play: 'Play & Win', emailLabel: 'Your email', emailPlaceholder: 'you@example.com',
     start: 'Play now', sending: 'Please wait…', invalidEmail: 'Please enter a valid email address.',
-    spin: 'SPIN', spinning: 'Spinning…', yourReward: 'You won!', yourRewards: 'You won!',
+    spin: 'SPIN', spinning: 'Spinning…', yourReward: 'You won!', yourRewards: 'You won!', congrats: 'Congratulations!',
     code: 'Your code', copy: 'Copy', copied: 'Copied!',
     oneUse: 'Single use. Expires', emailed: 'We also emailed this code to', close: 'Close',
     already: 'You already played this week.', comeBack: 'Come back on', error: 'Something went wrong. Please try again.',
@@ -49,7 +49,7 @@ export const UI = {
   fr: {
     play: 'Jouer et gagner', emailLabel: 'Votre courriel', emailPlaceholder: 'vous@exemple.com',
     start: 'Jouer', sending: 'Veuillez patienter…', invalidEmail: 'Veuillez entrer une adresse courriel valide.',
-    spin: 'TOURNER', spinning: 'Rotation…', yourReward: 'Vous avez gagné!', yourRewards: 'Vous avez gagné!',
+    spin: 'TOURNER', spinning: 'Rotation…', yourReward: 'Vous avez gagné!', yourRewards: 'Vous avez gagné!', congrats: 'Félicitations!',
     code: 'Votre code', copy: 'Copier', copied: 'Copié!',
     oneUse: 'Usage unique. Expire le', emailed: 'Nous avons aussi envoyé ce code à', close: 'Fermer',
     already: 'Vous avez déjà joué cette semaine.', comeBack: 'Revenez le', error: 'Une erreur est survenue. Veuillez réessayer.',

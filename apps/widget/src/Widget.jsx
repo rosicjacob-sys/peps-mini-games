@@ -3,6 +3,7 @@ import { UI, INTRO_DEFAULTS, LOCALES, pickLocale, t, themeFor, GAME_TYPES } from
 import Wheel from './games/Wheel.jsx';
 import Blackjack from './games/Blackjack.jsx';
 import Slots from './games/Slots.jsx';
+import Confetti from './Confetti.jsx';
 
 const GAMES = { wheel: Wheel, blackjack: Blackjack, slots: Slots };
 
@@ -201,7 +202,9 @@ function Play({ game, api, store, locale, onClose }) {
 
   return (
     <div className="screen result">
-      <h2>{result.rewards.length > 1 ? ui.yourRewards : ui.yourReward}</h2>
+      <Confetti />
+      <h2 className="congrats">{ui.congrats}</h2>
+      <p className="muted won">{result.rewards.length > 1 ? ui.yourRewards : ui.yourReward}</p>
       {result.rewards.map((r) => <RewardCard key={r.id} r={r} locale={locale} />)}
       <p className="fine strong">{ui.oneUse} {result.expiresText}.</p>
       <p className="fine">{ui.emailed} {result.email}</p>
