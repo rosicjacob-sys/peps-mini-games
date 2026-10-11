@@ -87,6 +87,12 @@ adminRouter.get('/games/:id', wrap(async (req, res) => {
   res.json({ ...g, rewards, effective_sender: resolveSender(g) });
 }));
 
+// sound settings: effects on/off; music built-in, off, or a custom https file
+const cleanSound = (s = {}) => {
+  const url = /^https:\/\/\S+$/i.test(String(s.musicUrl || '').trim()) ? String(s.musicUrl).trim().slice(0, 500) : '';
+  const music = s.music === 'off' ? 'off' : s.music === 'custom' && url ? 'custom' : 'builtin';
+  return { sfx: s.sfx !== false, music, musicUrl: url };
+};
 function gameFields(b) {
   if (!GAME_TYPES[b.type]) throw Object.assign(new Error('bad_type'), { status: 400 });
   const fixed = GAME_TYPES[b.type].fixedTheme;
@@ -97,7 +103,7 @@ function gameFields(b) {
     type: b.type, name: String(b.name || GAME_TYPES[b.type].label).slice(0, 80),
     status: b.status === 'paused' ? 'paused' : 'active', theme, brand,
     per: singleReward(b.type) ? 1 : Math.min(5, Math.max(1, parseInt(b.rewards_per_play, 10) || 1)),
-    texts: { heading: loc(tx.heading), subheading: loc(tx.subheading), privacy: loc(tx.privacy), triggerLabel: loc(tx.triggerLabel), privacyUrl: String(tx.privacyUrl || '').slice(0, 300), intro: cleanIntro(tx.intro) },
+    texts: { heading: loc(tx.heading), subheading: loc(tx.subheading), privacy: loc(tx.privacy), triggerLabel: loc(tx.triggerLabel), privacyUrl: String(tx.privacyUrl || '').slice(0, 300), intro: cleanIntro(tx.intro), sound: cleanSound(tx.sound) },
     from_name: String(b.from_name || '').slice(0, 120), from_email: String(b.from_email || '').trim().slice(0, 254), reply_to: String(b.reply_to || '').trim().slice(0, 254),
     subject: loc(b.email_subject),
   };

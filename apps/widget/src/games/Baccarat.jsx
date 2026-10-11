@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { UI } from '@peps/shared';
 import { points, baccaratResolve } from '@peps/shared/cards.js';
+import { sound } from '../sound.js';
 import { Card, Deck, wait, DEAL, DEAL_DONE, CARD_MS, useLanded } from './Card.jsx';
 
 // Baccarat: the player bets Player, Banker or Tie; the hand is dealt with the standard third-card rules from the
@@ -14,7 +15,7 @@ export default function Baccarat({ result, locale, onDone }) {
 
   // Deal like Lucky 9: player, banker, player, banker from the deck, then any third cards one at a time.
   async function place(k) {
-    if (bet) return; setBet(k);
+    if (bet) return; setBet(k); sound.play('chip');
     const r = baccaratResolve(result.script.deals[k]); setRound(r);
     await wait(250); if (!alive.current) return;
     setN({ player: 2, banker: 2 });
@@ -23,7 +24,8 @@ export default function Baccarat({ result, locale, onDone }) {
       if (!r[side][2]) continue;
       await wait(700); if (!alive.current) return; setN((x) => ({ ...x, [side]: 3 })); await wait(CARD_MS);
     }
-    await wait(500); if (alive.current) setWinner(r.winner);
+    await wait(500); if (!alive.current) return;
+    setWinner(r.winner); sound.play(r.winner === k ? 'win' : 'lose');
   }
   const won = winner && winner === bet;
   // the first two cards of each hand go out in DEAL order: player 0, banker 0, player 1, banker 1

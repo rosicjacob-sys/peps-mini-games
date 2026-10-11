@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { UI } from '@peps/shared';
 import { handValue, canHit, playRound, isBlackjack } from '@peps/shared/blackjack.js';
+import { sound } from '../sound.js';
 import { Card, Deck, DEAL, DEAL_DONE, CARD_MS, useLanded } from './Card.jsx';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -43,6 +44,7 @@ export default function Blackjack({ result, locale, onDone }) {
     setBust(!!round.bust);
     // `script.target` is what the server decided; the engine guarantees round.outcome === target.
     setOutcome(script.target); setPhase('done');
+    if (script.target !== 'push') sound.play(script.target === 'loss' ? 'lose' : 'win');
   }
 
   // naturals resolve themselves

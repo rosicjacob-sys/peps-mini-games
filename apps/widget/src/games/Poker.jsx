@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { UI, t } from '@peps/shared';
 import { HANDS } from '@peps/shared/cards.js';
 import { Card, Deck, wait } from './Card.jsx';
+import { sound } from '../sound.js';
 
 // Five-card poker, no draw: the paytable maps each hand to a reward (rarer reward → better hand). DEAL sends five
 // cards face down from the deck, then they flip one by one; a loss shows no winning hand.
@@ -16,7 +17,7 @@ export default function Poker({ game, result, locale, onDone }) {
     if (busy || done) return; setBusy(true); setDealt(true);
     await wait(5 * 180 + 500);
     for (let i = 1; i <= 5; i++) { if (!alive.current) return; setFlipped(i); await wait(i === 4 ? 950 : 520); }
-    if (!alive.current) return; setBusy(false); setDone(true);
+    if (!alive.current) return; setBusy(false); setDone(true); sound.play(lost ? 'lose' : 'win');
     setTimeout(() => alive.current && onDone(), 1900);
   }
 
