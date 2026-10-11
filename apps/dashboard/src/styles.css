@@ -323,7 +323,7 @@ td > .pill:first-child { margin-left: 0; }
 .lib-text { display: flex; flex-direction: column; min-width: 0; } .lib-text b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lib-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; } .lib-meta code { margin-left: 0; }
 .lib-games { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lib-actions { display: flex; justify-content: flex-end; }
+.lib-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .lib-form h2 { margin-bottom: 12px; }
 .reward-row.linked .linked-head { flex-wrap: wrap; margin-bottom: 12px; } .reward-row.linked .linked-head .lib-text { flex: 1; min-width: 160px; }
 .reward-row.linked .linked-head .pill { margin-left: 0; } .reward-row.linked .linked-head a { color: var(--s1); }
