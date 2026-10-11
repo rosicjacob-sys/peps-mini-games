@@ -183,7 +183,12 @@ function Settings({ game, reload, section, back }) {
             <label className="grow">From email<input type="email" value={g.from_email} onChange={(e) => setG({ ...g, from_email: e.target.value })} placeholder="rewards@yourdomain.com" /></label>
             <label className="grow">Reply-to<input type="email" value={g.reply_to} onChange={(e) => setG({ ...g, reply_to: e.target.value })} /></label>
           </div>
-          <p className="muted">The from-address domain must be verified in your Resend account.</p>
+          <p className="muted">
+            {game.effective_sender?.source === 'game' && <>Sending as <b>{game.effective_sender.from_name} &lt;{game.effective_sender.from_email}&gt;</b> (set on this game).</>}
+            {game.effective_sender?.source === 'group' && <>Blank — sending as <b>{game.effective_sender.from_name} &lt;{game.effective_sender.from_email}&gt;</b>, the default of store group "{game.group_name}". Fill these in to override.</>}
+            {game.effective_sender?.source === 'none' && <b className="bad">No sender set — code emails will not be sent. Set one here or on the store group.</b>}
+            {' '}The from-address domain must be verified in your Resend account.
+          </p>
           <Loc label="Email subject" value={g.email_subject} onChange={(v) => setG({ ...g, email_subject: v })} ph="Your reward code" />
           <p className="muted">Every code email states the code is single-use and expires Sunday 11:59 PM ET; players can play once per week (resets Monday 12:00 AM ET).</p>
         </>

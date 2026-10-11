@@ -50,7 +50,9 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
   const mail = normalizeEmail(req.body?.email);
   if (!mail) return res.status(400).json({ error: 'invalid_email' });
 
-  const { rows: [game] } = await q("SELECT * FROM games WHERE id = $1 AND store_id = $2 AND status = 'active'", [gameId, store.id]);
+  const { rows: [game] } = await q(`SELECT g.*, sg.from_name AS group_from_name, sg.from_email AS group_from_email, sg.reply_to AS group_reply_to
+    FROM games g JOIN stores s ON s.id = g.store_id LEFT JOIN store_groups sg ON sg.id = s.group_id
+    WHERE g.id = $1 AND g.store_id = $2 AND g.status = 'active'`, [gameId, store.id]);
   if (!game || !GAME_TYPES[game.type]) return res.status(404).json({ error: 'game_unavailable' });
   const { rows: rewards } = await q('SELECT * FROM rewards WHERE game_id = $1 AND active ORDER BY sort, id', [game.id]);
   // blackjack (one hand) and slots (one payline) always award exactly one reward

@@ -20,6 +20,10 @@ async function req(path, opts = {}) {
 
 export const api = {
   login: async (password) => { const { token: t } = await req('/login', { method: 'POST', body: { password } }); token = t; localStorage.setItem('pg_token', t); },
+  groups: () => req('/groups'),
+  createGroup: (b) => req('/groups', { method: 'POST', body: b }),
+  updateGroup: (id, b) => req(`/groups/${id}`, { method: 'PUT', body: b }),
+  deleteGroup: (id) => req(`/groups/${id}`, { method: 'DELETE' }),
   stores: () => req('/stores'),
   createStore: (b) => req('/stores', { method: 'POST', body: b }),
   updateStore: (id, b) => req(`/stores/${id}`, { method: 'PUT', body: b }),
