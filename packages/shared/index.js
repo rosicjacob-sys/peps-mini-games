@@ -3,29 +3,27 @@
 export const LOCALES = ['en', 'fr'];
 
 export const GAME_TYPES = {
-  blackjack: { label: 'Blackjack', fixedTheme: 'casino-purple' },
-  wheel: { label: 'Prize Wheel' },
-  slots: { label: 'Slot Machine' },
+  blackjack: { label: 'Blackjack', icon: '♠', fixedTheme: 'casino-purple' },
+  wheel: { label: 'Prize Wheel', icon: '🎡' },
+  slots: { label: 'Slot Machine', icon: '🎰' },
 };
 
-// Neutral palettes — accents are greys/whites so they sit well next to a
-// store's gold, blue, red, green or pink branding. `brandAccent` on a game can
-// override `accent` if a client wants their colour in the mix.
+// Casino palettes. Every theme carries gold trim (rim); the accent is the button colour.
+// `brandAccent` on a game can still override `accent` if a client wants their colour on the buttons.
 export const THEMES = {
-  'ivory':    { label: 'Ivory',    bg: '#FAF8F4', surface: '#FFFFFF', text: '#1F1F1F', muted: '#6B6B6B', accent: '#2B2B2B', accentText: '#FFFFFF', border: '#E4E0D8', slices: ['#FFFFFF', '#EFEBE3'], wheel: ['#FFFFFF', '#EFEBE3', '#F7F4EE', '#E4E0D8'], rim: '#2B2B2B' },
-  'pearl':    { label: 'Pearl',    bg: '#F3F4F6', surface: '#FFFFFF', text: '#111827', muted: '#6B7280', accent: '#374151', accentText: '#FFFFFF', border: '#E5E7EB', slices: ['#FFFFFF', '#E5E7EB'], wheel: ['#FFFFFF', '#E5E7EB', '#F9FAFB', '#D1D5DB'], rim: '#374151' },
-  'stone':    { label: 'Stone',    bg: '#E7E5E4', surface: '#F5F5F4', text: '#1C1917', muted: '#78716C', accent: '#44403C', accentText: '#FFFFFF', border: '#D6D3D1', slices: ['#F5F5F4', '#D6D3D1'], wheel: ['#F5F5F4', '#D6D3D1', '#E7E5E4', '#C9C5C2'], rim: '#44403C' },
-  'silver':   { label: 'Silver',   bg: '#D1D5DB', surface: '#F3F4F6', text: '#111827', muted: '#4B5563', accent: '#1F2937', accentText: '#FFFFFF', border: '#9CA3AF', slices: ['#F3F4F6', '#CBD0D8'], wheel: ['#F3F4F6', '#CBD0D8', '#E5E7EB', '#B8BEC7'], rim: '#1F2937' },
-  'graphite': { label: 'Graphite', bg: '#2A2A2D', surface: '#37373B', text: '#F4F4F5', muted: '#A1A1AA', accent: '#E4E4E7', accentText: '#18181B', border: '#4A4A50', slices: ['#3F3F45', '#2F2F34'], wheel: ['#3F3F45', '#2F2F34', '#4A4A50', '#2A2A2D'], rim: '#E4E4E7' },
-  'midnight': { label: 'Midnight', bg: '#0F1115', surface: '#1A1D23', text: '#F5F5F5', muted: '#9AA0AA', accent: '#F5F5F5', accentText: '#0F1115', border: '#2B3038', slices: ['#22262D', '#171A20'], wheel: ['#22262D', '#171A20', '#2B3038', '#1C2027'], rim: '#F5F5F5' },
-  'casino-purple': { label: 'Casino Purple', bg: '#14081F', surface: '#1F0F33', text: '#FFFFFF', muted: '#C4B5FD', accent: '#6B21D8', accentText: '#FFFFFF', border: '#3B1B66', slices: ['#2A1347', '#1F0F33'], wheel: ['#6D28D9', '#3B0764', '#8B5CF6', '#4C1D95'], rim: '#D6B24A', rimText: '#1f1230', marquee: 'gold', locked: true },
+  'emerald':  { label: 'Emerald felt',  bg: '#0B3D2E', surface: '#0F4D3A', text: '#FFF8E7', muted: '#A7D7C3', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#0F5C44', '#083B2C'], wheel: ['#0F5C44', '#083B2C', '#146B50', '#0A4A37'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
+  'burgundy': { label: 'Burgundy',      bg: '#3B0A12', surface: '#4A0F19', text: '#FFF4E6', muted: '#E6B8BF', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#5E1420', '#3B0A12'], wheel: ['#5E1420', '#3B0A12', '#7A1B2A', '#4A0F19'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
+  'black-gold': { label: 'Black & gold', bg: '#0D0D0F', surface: '#17171B', text: '#FFF8E7', muted: '#B5B5BD', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#1F1F24', '#121215'], wheel: ['#1F1F24', '#121215', '#2A2A30', '#18181C'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
+  'royal-blue': { label: 'Royal blue',  bg: '#0B1F4D', surface: '#102A66', text: '#FFF8E7', muted: '#A9BBE6', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#143A8A', '#0B1F4D'], wheel: ['#143A8A', '#0B1F4D', '#1C4AA8', '#10306E'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
+  'crimson':  { label: 'Crimson',       bg: '#5A0E0E', surface: '#6E1414', text: '#FFF4E6', muted: '#F0B9B9', accent: '#D6B24A', accentText: '#1f1a0a', border: '#8C6D1F', slices: ['#8A1C1C', '#5A0E0E'], wheel: ['#8A1C1C', '#5A0E0E', '#A32424', '#701515'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold' },
+  'casino-purple': { label: 'Casino purple', bg: '#14081F', surface: '#1F0F33', text: '#FFFFFF', muted: '#C4B5FD', accent: '#6B21D8', accentText: '#FFFFFF', border: '#8C6D1F', slices: ['#2A1347', '#1F0F33'], wheel: ['#6D28D9', '#3B0764', '#8B5CF6', '#4C1D95'], rim: '#D6B24A', rimText: '#1f1a0a', marquee: 'gold', locked: true },
 };
 
-// Slot machine symbols. A reward without a chosen symbol gets one by its position.
+// Slot machine tile icons. A reward without a chosen symbol gets one by its position.
 export const SLOT_SYMBOLS = ['🍒', '🍋', '🔔', '⭐', '💎', '7️⃣', '🍀', '🎁', '🍇', '👑'];
 export const symbolFor = (reward, index) => reward.symbol || SLOT_SYMBOLS[index % SLOT_SYMBOLS.length];
 
-export const DEFAULT_THEME = 'pearl';
+export const DEFAULT_THEME = 'emerald';
 
 export function themeFor(type, themeKey) {
   const fixed = GAME_TYPES[type]?.fixedTheme;
@@ -42,6 +40,7 @@ export const UI = {
     code: 'Your code', copy: 'Copy', copied: 'Copied!',
     oneUse: 'Single use. Expires', emailed: 'We also emailed this code to', close: 'Close',
     redeem: 'Enter this code in your cart to apply your reward.', spinHeading: 'Spin your reward',
+    choose: 'Choose your game', gateHeading: 'Enter to play', matchThree: 'Match three to win',
     already: 'You already played this week.', comeBack: 'Come back on', error: 'Something went wrong. Please try again.',
     paused: 'This game is not available right now.',
     hit: 'Hit', stand: 'Stand', dealer: 'Dealer', you: 'You', bust: 'Bust!',
@@ -54,6 +53,7 @@ export const UI = {
     code: 'Votre code', copy: 'Copier', copied: 'Copié!',
     oneUse: 'Usage unique. Expire le', emailed: 'Nous avons aussi envoyé ce code à', close: 'Fermer',
     redeem: 'Entrez ce code dans votre panier pour appliquer votre récompense.', spinHeading: 'Tournez pour votre récompense',
+    choose: 'Choisissez votre jeu', gateHeading: 'Entrez pour jouer', matchThree: 'Alignez-en trois pour gagner',
     already: 'Vous avez déjà joué cette semaine.', comeBack: 'Revenez le', error: 'Une erreur est survenue. Veuillez réessayer.',
     paused: "Ce jeu n'est pas disponible pour le moment.",
     hit: 'Carte', stand: 'Rester', dealer: 'Croupier', you: 'Vous', bust: 'Dépassé!',

@@ -82,3 +82,7 @@ CREATE TABLE IF NOT EXISTS store_groups (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE stores ADD COLUMN IF NOT EXISTS group_id uuid REFERENCES store_groups(id) ON DELETE SET NULL;
+
+-- casino palettes replaced the neutral ones
+ALTER TABLE games ALTER COLUMN theme SET DEFAULT 'emerald';
+UPDATE games SET theme = 'emerald' WHERE theme IN ('pearl', 'ivory', 'stone', 'silver', 'graphite', 'midnight');

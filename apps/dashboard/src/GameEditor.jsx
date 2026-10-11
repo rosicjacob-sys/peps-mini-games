@@ -144,8 +144,8 @@ function Settings({ game, reload, section, back }) {
             {g.type === 'wheel' && <label>Rewards per play<input className="num-in" type="number" min="1" max="5" value={g.rewards_per_play} onChange={(e) => setG({ ...g, rewards_per_play: e.target.value })} /></label>}
             <label className="grow">Internal name<input value={g.name} onChange={(e) => setG({ ...g, name: e.target.value })} /></label>
           </div>
-          <h3>Colour theme</h3>
-          {fixed ? <p className="muted">Blackjack keeps its signature purple theme.</p> : (
+          <h3>Casino theme</h3>
+          {fixed ? <p className="muted">Blackjack keeps its signature purple-and-gold theme.</p> : (
             <>
               <div className="themes">
                 {Object.entries(THEMES).filter(([, v]) => !v.locked).map(([k, v]) => (
@@ -155,7 +155,7 @@ function Settings({ game, reload, section, back }) {
                 ))}
               </div>
               <div className="row">
-                <label>Brand accent colour <span className="muted">(optional — buttons & pointer)</span>
+                <label>Brand accent colour <span className="muted">(optional — replaces the gold on buttons)</span>
                   <input type="color" value={g.brand_accent || th.accent} onChange={(e) => setG({ ...g, brand_accent: e.target.value })} /></label>
                 {g.brand_accent && <button className="link" onClick={() => setG({ ...g, brand_accent: null })}>Reset to neutral</button>}
               </div>
