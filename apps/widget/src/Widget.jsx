@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { UI, pickLocale, t, themeFor, GAME_TYPES } from '@peps/shared';
 import Wheel from './games/Wheel.jsx';
+import Blackjack from './games/Blackjack.jsx';
 
-const GAMES = { wheel: Wheel };
+const GAMES = { wheel: Wheel, blackjack: Blackjack };
 
 function cssVars(game) {
   const th = themeFor(game.type, game.theme);

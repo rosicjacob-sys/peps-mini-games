@@ -2,8 +2,9 @@ import { Router } from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { pickLocale, GAME_TYPES } from '@peps/shared';
+import { buildScript } from '@peps/shared/blackjack.js';
 import { q, pool } from './db.js';
-import { weekInfo, normalizeEmail, pickRewards, hashIp, formatExpiry } from './lib.js';
+import { weekInfo, normalizeEmail, pickRewards, hashIp, formatExpiry, secureRandom } from './lib.js';
 import { buildEmail, sendEmail } from './email.js';
 
 export const publicRouter = Router();
@@ -51,7 +52,8 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
   const { rows: [game] } = await q("SELECT * FROM games WHERE id = $1 AND store_id = $2 AND status = 'active'", [gameId, store.id]);
   if (!game || !GAME_TYPES[game.type]) return res.status(404).json({ error: 'game_unavailable' });
   const { rows: rewards } = await q('SELECT * FROM rewards WHERE game_id = $1 AND active ORDER BY sort, id', [game.id]);
-  const picks = pickRewards(rewards, game.rewards_per_play);
+  // blackjack shows one hand, so it always awards exactly one reward
+  const picks = pickRewards(rewards, game.type === 'blackjack' ? 1 : game.rewards_per_play);
   if (!picks.length) return res.status(409).json({ error: 'game_unavailable' });
 
   const week = weekInfo();
@@ -84,6 +86,8 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
   res.json({
     email: mail.email,
     rewards: picks.map((r) => ({ id: r.id, title: r.title, subtitle: r.subtitle, code: r.code })),
+    // the hand is dealt so it ends in this reward's configured result, whatever the player does
+    ...(game.type === 'blackjack' ? { script: buildScript(picks[0].outcome || 'win', secureRandom) } : {}),
     expiresAt: week.expiresAt,
     expiresText: formatExpiry(week.expiresAt, locale),
   });
