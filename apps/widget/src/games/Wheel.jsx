@@ -34,7 +34,11 @@ function layoutLabel(text, maxLines) {
 export default function Wheel({ game, result, locale, onDone }) {
   const ui = UI[locale];
   const th = themeFor(game.type, game.theme);
-  const n = game.rewards.length;
+  // a standalone wheel that can lose gets a "Try again" slice; a lost play spins once onto it
+  const LOSE = '__lose';
+  const slices = game.type === 'wheel' && game.canLose ? [...game.rewards, { id: LOSE, title: { en: ui.lose.slice, fr: ui.lose.slice }, lose: true }] : game.rewards;
+  const targets = result.lost ? [LOSE] : result.rewards.map((r) => r.id);
+  const n = slices.length;
   const step = 360 / n;
   const maxLines = n <= 4 ? 3 : 2;
   const [rot, setRot] = useState(0);
@@ -49,7 +53,7 @@ export default function Wheel({ game, result, locale, onDone }) {
 
   function go() {
     if (spinning) return;
-    const target = game.rewards.findIndex((r) => r.id === result.rewards[spin].id);
+    const target = slices.findIndex((r) => r.id === targets[spin]);
     // Land on a random point inside the slice (not dead centre) for a natural look.
     const within = (Math.random() - 0.5) * step * 0.6;
     const landing = 360 - (target * step + step / 2 + within);
@@ -69,8 +73,8 @@ export default function Wheel({ game, result, locale, onDone }) {
     spinningRef.current = false;
     clearTimeout(timer.current);
     setSpinning(false);
-    setWonId(result.rewards[spin].id);
-    if (spin + 1 >= result.rewards.length) setTimeout(onDone, 1400);
+    setWonId(targets[spin]);
+    if (spin + 1 >= targets.length) setTimeout(onDone, 1400);
     else setSpin(spin + 1);
   }
 
@@ -94,7 +98,7 @@ export default function Wheel({ game, result, locale, onDone }) {
           <radialGradient id="pg-edge" cx="50%" cy="50%" r="50%"><stop offset="80%" stopColor="#000" stopOpacity="0" /><stop offset="100%" stopColor="#000" stopOpacity=".35" /></radialGradient>
           <radialGradient id="pg-hub" cx="40%" cy="35%" r="70%"><stop offset="0%" stopColor="#fff" stopOpacity=".35" /><stop offset="100%" stopColor="#000" stopOpacity=".25" /></radialGradient>
         </defs>
-        {game.rewards.map((r, i) => {
+        {slices.map((r, i) => {
           const a0 = i * step, a1 = (i + 1) * step;
           const [x0, y0] = polar(a0, R - 7), [x1, y1] = polar(a1, R - 7);
           const fill = tones[(n % tones.length === 1 && i === n - 1) ? 1 : i % tones.length];
@@ -133,7 +137,7 @@ export default function Wheel({ game, result, locale, onDone }) {
         <text x={R} y={R + 1} fill={rim} fontSize="24" textAnchor="middle" dominantBaseline="middle" style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,.6))' }}>★</text>
       </svg>
       </div>
-      <button className="btn" disabled={spinning} onClick={go}>{spinning ? ui.spinning : result.rewards.length > 1 ? `${ui.spin} (${spin + 1}/${result.rewards.length})` : ui.spin}</button>
+      <button className="btn" disabled={spinning} onClick={go}>{spinning ? ui.spinning : targets.length > 1 ? `${ui.spin} (${spin + 1}/${targets.length})` : ui.spin}</button>
     </div>
   );
 }

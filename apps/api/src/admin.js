@@ -131,12 +131,14 @@ adminRouter.put('/games/:id/rewards', wrap(async (req, res) => {
   if (clean.some((r) => !r.title.en || !r.code)) return res.status(400).json({ error: 'Every reward needs an English title and a code.' });
   const max = GAME_TYPES[g.type]?.maxRewards;
   if (max && clean.filter((r) => r.active).length > max) return res.status(400).json({ error: `${GAME_TYPES[g.type].label} has ${max} colours, so it can have at most ${max} active rewards.` });
-  const total = clean.filter((r) => r.active).reduce((s, r) => s + r.probability, 0);
-  if (clean.some((r) => r.active) && Math.abs(total - 100) > 0.01) return res.status(400).json({ error: `Active probabilities must add up to 100% (currently ${total.toFixed(2)}%).` });
+  const lose = Math.max(0, Math.min(100, Number(req.body.lose_percent) || 0));
+  const total = clean.filter((r) => r.active).reduce((s, r) => s + r.probability, 0) + lose;
+  if ((clean.some((r) => r.active) || lose) && Math.abs(total - 100) > 0.01) return res.status(400).json({ error: `Active rewards plus "No reward" must add up to 100% (currently ${total.toFixed(2)}%).` });
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await client.query('UPDATE games SET lose_percent = $2 WHERE id = $1', [req.params.id, lose]);
     const keep = clean.filter((r) => r.id).map((r) => r.id);
     await client.query('DELETE FROM rewards WHERE game_id = $1 AND NOT (id = ANY($2::uuid[]))', [req.params.id, keep]);
     for (const r of clean) {

@@ -40,7 +40,8 @@ const Loc = ({ label, value, onChange, ph, rows }) => (
 function Rewards({ game, reload }) {
   const [rows, setRows] = useState(game.rewards.map((r) => ({ ...r, probability: Number(r.probability) })));
   const [msg, setMsg] = useState(''); const [err, setErr] = useState('');
-  const total = useMemo(() => rows.filter((r) => r.active).reduce((s, r) => s + (Number(r.probability) || 0), 0), [rows]);
+  const [lose, setLose] = useState(Number(game.lose_percent) || 0);   // chance a play wins nothing
+  const total = useMemo(() => rows.filter((r) => r.active).reduce((s, r) => s + (Number(r.probability) || 0), 0) + (Number(lose) || 0), [rows, lose]);
   const set = (i, patch) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   // poker: which hand each reward is paid on; color game: which colour each active reward sits on
   const tiers = game.type === 'poker' ? pokerTiers(rows.map((r, i) => ({ ...r, id: r.id || `new${i}`, sort: i }))) : {};
@@ -49,12 +50,13 @@ function Rewards({ game, reload }) {
   function equalise() {
     const n = rows.filter((r) => r.active).length;
     if (!n) return;
-    const cents = Math.floor(10000 / n); const extra = 10000 - cents * n; let seen = 0; // leftover cents go to the first rewards
+    const pool = Math.round((100 - (Number(lose) || 0)) * 100);            // what's left after the lose chance, in cents
+    const cents = Math.floor(pool / n); const extra = pool - cents * n; let seen = 0; // leftover cents go to the first rewards
     setRows(rows.map((r) => (r.active ? { ...r, probability: (cents + (seen++ < extra ? 1 : 0)) / 100 } : r)));
   }
   async function save() {
     setErr(''); setMsg('');
-    try { const saved = await api.saveRewards(game.id, rows); setRows(saved.map((r) => ({ ...r, probability: Number(r.probability) }))); setMsg('Saved — live on the store now.'); reload(); } catch (e) { setErr(e.message); }
+    try { const saved = await api.saveRewards(game.id, rows, Number(lose) || 0); setRows(saved.map((r) => ({ ...r, probability: Number(r.probability) }))); setMsg('Saved — live on the store now.'); reload(); } catch (e) { setErr(e.message); }
   }
   return (
     <>
@@ -78,6 +80,13 @@ function Rewards({ game, reload }) {
           </div>
         </div>
       ))}
+      <div className="card reward-row lose-row">
+        <div className="row">
+          <div className="grow"><b>No reward — the player loses</b>
+            <p className="muted small">The chance a play wins nothing. They see a loss in the game (dealer or banker wins, no match, no winning hand, or "Try again" on the wheel), then "Try again next week" with a note about weekly promotions. No email is sent. Set 0 so everyone wins.</p></div>
+          <label>Probability %<input className="num-in" type="number" min="0" max="100" step="0.5" value={lose} onChange={(e) => setLose(e.target.value)} /></label>
+        </div>
+      </div>
       <div className="row sticky">
         <button onClick={() => setRows([...rows, blankReward()])}>+ Add reward</button>
         <button onClick={equalise}>Split evenly</button>

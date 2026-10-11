@@ -309,3 +309,6 @@ td > .pill:first-child { margin-left: 0; }
 .snippet button { flex: none; align-self: flex-start; }
 .empty-state { text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 36px; }
 @media (max-width: 860px) { .form-grid { grid-template-columns: 1fr; } .store-actions { width: 100%; } .store-actions button { flex: 1; } }
+
+.lose-row { border-style: dashed; }
+.lose-row .grow { flex: 3; display: flex; flex-direction: column; gap: 4px; }

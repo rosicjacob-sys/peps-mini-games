@@ -197,7 +197,7 @@ function Play({ game, api, store, locale, onClose, onBack }) {
         body: JSON.stringify({ key: store, gameId: game.id, email: email.trim(), locale }),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok) { setResult(data); if (!data.test) try { localStorage.setItem(`pg_played_${game.id}`, data.expiresAt); } catch {} }
+      if (res.ok) { setResult(data); if (!data.test) try { localStorage.setItem(`pg_played_${game.id}`, data.nextPlayAt || data.expiresAt); } catch {} }
       else if (data.error === 'already_played') { try { localStorage.setItem(`pg_played_${game.id}`, data.nextPlayAt); } catch {} setError(`${ui.already} ${ui.comeBack} ${new Date(data.nextPlayAt).toLocaleDateString(locale === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}.`); }
       else if (data.error === 'invalid_email') setError(ui.invalidEmail);
       else setError(ui.error);
@@ -228,10 +228,22 @@ function Play({ game, api, store, locale, onClose, onBack }) {
 
   if (!done) {
     const Stage = stages[stage];
-    const next = () => (stage + 1 < stages.length ? setStage(stage + 1) : setDone(true));
+    const next = () => (!result.lost && stage + 1 < stages.length ? setStage(stage + 1) : setDone(true));
     // a wheel that follows another stage gets its own heading
     return <div className="screen"><h2 className="marquee">{stage > 0 ? ui.spinHeading : heading}</h2><Stage key={stage} game={game} result={result} locale={locale} onDone={next} /></div>;
   }
+
+  if (result.lost) return (
+    <div className="screen result lose">
+      <Bulbs />
+      <h2 className="marquee">{ui.lose.title}</h2>
+      <div className="lose-card">
+        <p className="lose-when">{ui.lose.retry} <b>{result.nextPlayText}</b>.</p>
+        <p>✉️ {ui.lose.promo}</p>
+      </div>
+      <button className="btn ghost" onClick={onClose}>{ui.close}</button>
+    </div>
+  );
 
   return (
     <div className="screen result">

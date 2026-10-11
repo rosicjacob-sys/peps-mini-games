@@ -20,6 +20,8 @@ function insights(o) {
   const odd = oddsChecks(o.rewards)[0];
   if (odd) out.push({ tone: 'warn', text: `${tr(odd.title)} (${odd.game} · ${odd.store}) is landing ${pct(odd.actual, 1)} vs ${pct(odd.set, 1)} set — check the odds.` });
   if (k.failed) out.push({ tone: 'bad', text: `${fmtInt(k.failed)} code email${k.failed === 1 ? '' : 's'} failed to send — see Email delivery.`, link: 'delivery' });
+  const lostN = o.rewards.filter((r) => r.lost).reduce((a, r) => a + r.won, 0);
+  if (lostN && k.plays) out.push({ tone: 'info', text: `${pct(lostN / k.plays)} of plays won nothing (${fmtInt(lostN)}).` });
   if (k.fr) out.push({ tone: 'info', text: `French: ${pct(k.fr / k.plays)} of plays.` });
   return out;
 }
@@ -148,8 +150,8 @@ function Rewards({ o, go }) {
         {[...byGame.values()].map((g) => (
           <div key={g.game + g.store} className="reward-game">
             <div className="rg-head"><b>{g.game}</b><span className="muted"> · {g.store} · {fmtInt(g.plays)} plays</span></div>
-            <BarList format={(v) => pct(v, 1)} onSelect={go ? (r) => go('players', { reward_id: r.key }) : undefined}
-              rows={g.rows.map((r) => ({ key: r.reward_id, label: tr(r.title), sub: `${fmtInt(r.won)} won · ${r.code}`, value: g.plays ? r.won / g.plays : 0, target: r.probability != null ? r.probability / 100 : null,
+            <BarList format={(v) => pct(v, 1)} onSelect={go ? (r) => !String(r.key).startsWith('lost:') && go('players', { reward_id: r.key }) : undefined}
+              rows={g.rows.map((r) => ({ key: r.reward_id, label: tr(r.title), sub: r.lost ? `${fmtInt(r.won)} plays won nothing` : `${fmtInt(r.won)} won · ${r.code}`, color: r.lost ? 'var(--prev)' : undefined, value: g.plays ? r.won / g.plays : 0, target: r.probability != null ? r.probability / 100 : null,
                 note: flags.has(r.reward_id) ? '⚠ check odds' : r.probability != null ? `set ${r.probability}%` : 'removed' }))} />
           </div>
         ))}

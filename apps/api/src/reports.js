@@ -94,7 +94,9 @@ export function registerReports(router, wrap, csvCell) {
       ${where(s2.w)} GROUP BY pr.reward_id, g.id, g.name, g.type, s.name ORDER BY won DESC`, s2.params);
 
     const gp = P();
-    const gamePlays = q(`SELECT p.game_id, count(*)::int AS n ${BASE} ${where(gp.w)} GROUP BY 1`, gp.params);
+    const gamePlays = q(`SELECT p.game_id, g.name AS game, g.type, s.name AS store, g.lose_percent::float AS lose_percent, count(*)::int AS n,
+        count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM play_rewards x WHERE x.play_id = p.id))::int AS lost
+      ${BASE} ${where(gp.w)} GROUP BY 1, 2, 3, 4, 5`, gp.params);
 
     const by = (expr, extra = '') => { const x = P(); return q(`SELECT ${expr} AS key, ${extra} count(*)::int AS plays, count(DISTINCT p.email_norm)::int AS players
         ${BASE} ${where(x.w)} GROUP BY 1${extra ? ', 2' : ''} ORDER BY plays DESC`, x.params); };
@@ -117,6 +119,9 @@ export function registerReports(router, wrap, csvCell) {
     const [sr, nr, rw, bg, bs, bgm, bt, bl, ht, rc, gpl, ps] = await Promise.all([series, newSeries, rewards, byGroup, byStore, byGame, byType, byLocale, heat, recent, gamePlays, prevSeries]);
     const gpm = new Map(gpl.rows.map((x) => [x.game_id, x.n]));
     for (const x of rw.rows) x.game_plays = gpm.get(x.game_id) || 0;
+    // losses ("no reward") as their own row per game, compared with the lose chance that is set
+    for (const g of gpl.rows) if (g.lost || g.lose_percent > 0) rw.rows.push({ reward_id: `lost:${g.game_id}`, lost: true, title: { en: 'No reward (lost)', fr: 'Aucune récompense' }, code: '—',
+      game_id: g.game_id, game: g.game, type: g.type, store: g.store, won: g.lost, players: null, probability: g.lose_percent, active: true, game_plays: g.n });
 
     // fill empty buckets so the time axis is continuous
     const map = new Map(sr.rows.map((x) => [x.d, x])); const nmap = new Map(nr.rows.map((x) => [x.d, x.n]));
@@ -176,6 +181,7 @@ export function registerReports(router, wrap, csvCell) {
   // ---------- email delivery
   router.get('/deliveries', wrap(async (req, res) => {
     const qs = await resolve(req.query); const r = parseRange(qs); const params = []; const w = scope(qs, params); w.push(inRange(params, r.from, r.to));
+    w.push(`p.email_status <> 'skipped'`); // losses send no email
     if (['sent', 'failed', 'pending'].includes(qs.status)) { params.push(qs.status); w.push(`p.email_status = $${params.length}`); }
     const page = Math.max(0, parseInt(qs.page, 10) || 0);
     const [{ rows }, { rows: [c] }] = await Promise.all([

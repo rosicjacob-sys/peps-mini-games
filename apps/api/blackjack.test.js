@@ -12,6 +12,7 @@ for (const target of OUTCOMES) {
         if (k > 0 && !canHit(s, k - 1)) break;
         const r = playRound(s, k);
         assert.equal(r.outcome, target);
+        assert.notEqual(handValue(r.dealer), 21); // the dealer never shows 21
         if (r.dealer.length > 2) assert.ok(handValue(r.dealer.slice(0, -1)) < 17);
       }
     }

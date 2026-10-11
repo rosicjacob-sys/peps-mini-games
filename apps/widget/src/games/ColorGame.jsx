@@ -47,7 +47,7 @@ export default function ColorGame({ game, result, locale, onDone }) {
           </div>
         ))}
       </div>
-      {done && <div className="bj-result win">{ui.match}</div>}
+      {done && (win === undefined ? <div className="bj-result loss">{ui.noMatch}</div> : <div className="bj-result win">{ui.match}</div>)}
       <button className="btn play" disabled={rolling || done} onClick={roll}>{rolling ? ui.rolling : ui.roll}</button>
     </div>
   );

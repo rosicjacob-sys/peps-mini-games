@@ -81,7 +81,7 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 22px; f
 .bj-label b { color: #fff; font-size: 15px; margin-left: 5px; letter-spacing: 0; }
 .bj-cards { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; min-height: 84px; }
 .bj-card { position: relative; width: 58px; height: 82px; border-radius: 7px; color: #111; background: linear-gradient(160deg, #fff 0%, #f1f1f3 100%);
-  box-shadow: 0 6px 12px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.6) inset; animation: deal .45s cubic-bezier(.2,.8,.3,1) both; }
+  box-shadow: 0 6px 12px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.6) inset; }
 .bj-card .ci { position: absolute; font-size: 12px; font-weight: 800; line-height: 1; display: flex; flex-direction: column; align-items: center; }
 .bj-card .ci i { font-style: normal; font-size: 11px; margin-top: 1px; }
 .bj-card .tl { top: 5px; left: 5px; } .bj-card .br { bottom: 5px; right: 5px; transform: rotate(180deg); }
@@ -212,3 +212,19 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 22px; f
 
 .back-link { align-self: flex-start; background: none; border: 0; color: var(--rim); font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; margin: 4px 0 -8px; }
 .back-link:hover { text-decoration: underline; }
+
+/* dealing: the deck sits top-right of every card table; empty card spots before the deal */
+.table-felt .deck { position: absolute; top: 10px; right: 12px; width: 30px; height: 42px; z-index: 0; }
+.table-felt .bj-row, .table-felt .bac-hands, .table-felt .bac-bets, .table-felt > .bj-cards { position: relative; z-index: 1; }
+.bj-card { will-change: transform; backface-visibility: hidden; }
+.card-slot { width: 56px; height: 80px; border-radius: 7px; border: 2px dashed color-mix(in srgb, var(--rim) 45%, transparent); background: rgba(0,0,0,.12); }
+.bac-side .card-slot { width: 48px; height: 68px; }
+.poker-felt { padding-top: 58px; }
+.hand-name.lost { background: none; color: var(--muted); filter: none; }
+.bj-result.loss { color: var(--text); text-shadow: none; opacity: .9; }
+/* the "Not this time" screen */
+.result.lose .marquee { font-size: 30px; }
+.lose-card { border: 1px solid var(--rim); border-radius: 14px; background: rgba(0,0,0,.3); padding: 16px; display: flex; flex-direction: column; gap: 10px; font-size: 15px; line-height: 1.5; }
+.lose-when { font-size: 17px; }
+.table-felt .deck.top-center { right: auto; left: 50%; transform: translateX(-50%); top: 8px; }
+.bac-hands { padding-top: 8px; }
