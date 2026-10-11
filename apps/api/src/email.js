@@ -45,15 +45,20 @@ export function resolveSender(g) {
 }
 
 export async function sendEmail({ game, to, mail }) {
-  if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY missing — skipped'); return false; }
+  if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY missing — skipped'); return { ok: false, error: 'RESEND_API_KEY is not set on the API' }; }
   const sender = resolveSender(game);
-  if (!sender.from_email) { console.warn(`[email] game ${game.id} has no from_email (and no group default) — skipped`); return false; }
+  if (!sender.from_email) { console.warn(`[email] game ${game.id} has no from_email (and no group default) — skipped`); return { ok: false, error: 'No sender: set a From email on the game or its store group' }; }
   const from = sender.from_name ? `${sender.from_name} <${sender.from_email}>` : sender.from_email;
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ from, to: [to], subject: mail.subject, html: mail.html, text: mail.text, ...(sender.reply_to ? { reply_to: sender.reply_to } : {}) }),
   });
-  if (!res.ok) { console.error('[email] Resend error', res.status, await res.text()); return false; }
-  return true;
+  if (!res.ok) {
+    const body = await res.text();
+    console.error('[email] Resend error', res.status, body);
+    let msg = body; try { msg = JSON.parse(body).message || body; } catch {}
+    return { ok: false, error: `Resend ${res.status}: ${String(msg).slice(0, 300)}` };
+  }
+  return { ok: true };
 }

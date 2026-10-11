@@ -89,3 +89,12 @@ UPDATE games SET theme = 'emerald' WHERE theme IN ('pearl', 'ivory', 'stone', 's
 
 -- each game type has its own default: wheels that were swept onto Emerald go to Burgundy
 UPDATE games SET theme = 'burgundy' WHERE type = 'wheel' AND theme = 'emerald';
+
+-- email delivery details (reason shown in the dashboard; resends counted)
+ALTER TABLE plays ADD COLUMN IF NOT EXISTS email_error text;
+ALTER TABLE plays ADD COLUMN IF NOT EXISTS email_attempts int NOT NULL DEFAULT 1;
+ALTER TABLE plays ADD COLUMN IF NOT EXISTS last_email_at timestamptz;
+-- reporting
+CREATE INDEX IF NOT EXISTS plays_created_idx ON plays(created_at);
+CREATE INDEX IF NOT EXISTS plays_email_idx ON plays(email_norm);
+CREATE INDEX IF NOT EXISTS play_rewards_play_idx ON play_rewards(play_id);

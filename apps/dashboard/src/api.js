@@ -5,6 +5,8 @@ let token = localStorage.getItem('pg_token') || '';
 export const hasToken = () => !!token;
 export function logout() { token = ''; localStorage.removeItem('pg_token'); location.reload(); }
 
+const qs = (o = {}) => new URLSearchParams(Object.entries(o).filter(([, v]) => v !== '' && v != null)).toString();
+
 async function req(path, opts = {}) {
   const res = await fetch(`${BASE}/api/admin${path}`, {
     ...opts,
@@ -34,13 +36,17 @@ export const api = {
   updateGame: (id, b) => req(`/games/${id}`, { method: 'PUT', body: b }),
   deleteGame: (id) => req(`/games/${id}`, { method: 'DELETE' }),
   saveRewards: (id, rewards) => req(`/games/${id}/rewards`, { method: 'PUT', body: { rewards } }),
-  stats: (id) => req(`/games/${id}/stats`),
-  plays: (id, rewardId, offset = 0) => req(`/games/${id}/plays?limit=100&offset=${offset}${rewardId ? `&reward_id=${rewardId}` : ''}`),
-  async download(id, rewardId) {
-    const res = await fetch(`${BASE}/api/admin/games/${id}/export.csv${rewardId ? `?reward_id=${rewardId}` : ''}`, { headers: { Authorization: `Bearer ${token}` } });
+  // reports — every call takes the global filters { from, to, group_id, store_id, game_id }
+  overview: (f) => req(`/reports/overview?${qs(f)}`),
+  players: (f) => req(`/players?${qs(f)}`),
+  player: (email) => req(`/players/${encodeURIComponent(email)}`),
+  deliveries: (f) => req(`/deliveries?${qs(f)}`),
+  resend: (id) => req(`/plays/${id}/resend`, { method: 'POST' }),
+  async download(path, f, filename) {
+    const res = await fetch(`${BASE}/api/admin${path}?${qs(f)}`, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) throw new Error('Export failed');
     const url = URL.createObjectURL(await res.blob());
-    const a = Object.assign(document.createElement('a'), { href: url, download: 'players.csv' });
-    a.click(); URL.revokeObjectURL(url);
+    const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+    a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
 };

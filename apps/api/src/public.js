@@ -86,8 +86,8 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
   // Email is sent after responding so the player is never blocked by Resend.
   const content = buildEmail({ game, rewards: picks, locale, expiresAt: week.expiresAt });
   sendEmail({ game, to: mail.email, mail: content })
-    .then((ok) => q('UPDATE plays SET email_status = $2 WHERE id = $1', [playId, ok ? 'sent' : 'failed']))
-    .catch((e) => { console.error(e); return q("UPDATE plays SET email_status = 'failed' WHERE id = $1", [playId]); });
+    .then((r) => q('UPDATE plays SET email_status = $2, email_error = $3, last_email_at = now() WHERE id = $1', [playId, r.ok ? 'sent' : 'failed', r.ok ? null : r.error]))
+    .catch((e) => { console.error(e); return q("UPDATE plays SET email_status = 'failed', email_error = $2, last_email_at = now() WHERE id = $1", [playId, String(e.message || e).slice(0, 300)]); });
 
   res.json({
     email: mail.email,
