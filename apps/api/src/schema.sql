@@ -64,3 +64,6 @@ CREATE INDEX IF NOT EXISTS play_rewards_game_idx ON play_rewards(game_id, reward
 
 -- blackjack: which hand result a reward is shown with (blackjack | win | push | loss)
 ALTER TABLE rewards ADD COLUMN IF NOT EXISTS outcome text;
+
+-- slots: the symbol shown on the reels for this reward
+ALTER TABLE rewards ADD COLUMN IF NOT EXISTS symbol text;
