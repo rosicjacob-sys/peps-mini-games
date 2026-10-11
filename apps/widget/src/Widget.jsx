@@ -8,6 +8,7 @@ import Lucky9 from './games/Lucky9.jsx';
 import Baccarat from './games/Baccarat.jsx';
 import Poker from './games/Poker.jsx';
 import Confetti from './Confetti.jsx';
+import { sound } from './sound.js';
 
 // Stages a play goes through before the result screen. Blackjack is a warm-up hand, then the wheel decides the reward.
 const GAMES = { wheel: [Wheel], blackjack: [Blackjack, Wheel], slots: [Slots], color: [ColorGame], lucky9: [Lucky9, Wheel], baccarat: [Baccarat, Wheel], poker: [Poker] };
@@ -95,6 +96,10 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
   }, [store, api, gameType]);
 
   const current = game || games?.[0];
+  // sounds follow the game on screen; music plays only while the game window is open
+  useEffect(() => { if (current) sound.configure(current.texts?.sound); }, [current?.id]);
+  useEffect(() => { sound.music(open); return () => sound.music(false); }, [open]);
+  const openGame = () => { sound.unlock(); setOpen(true); };
   // closing forgets the chosen game when the store has several, so "Play & Win" opens the picker again
   const close = () => { setOpen(false); if (games?.length > 1) setGame(null); };
 
@@ -110,7 +115,7 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
   const finishIntro = (play) => {
     store_(() => sessionStorage.setItem('pg_intro_done', '1'));
     setIntro(false);
-    if (play) setOpen(true);
+    if (play) openGame();
   };
 
   if (!games?.length) return null;
@@ -118,19 +123,20 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
 
   return (
     <div style={cssVars(current)}>
-      <button className="trigger" onClick={() => setOpen(true)}><span className="trigger-suit" aria-hidden="true">♠</span>{label}</button>
+      <button className="trigger" onClick={openGame}><span className="trigger-suit" aria-hidden="true">♠</span>{label}</button>
       {intro && !open && <Intro game={current} locale={locale} setLocale={setLocale} onPlay={() => finishIntro(true)} onDecline={() => finishIntro(false)} />}
       {open && (
         <div className="overlay" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && close()}>
           <div className="modal">
             <LangToggle locale={locale} setLocale={setLocale} />
+            <SoundToggle locale={locale} />
             <button className="close" aria-label={ui.close} onClick={close}>×</button>
             {game ? <Play key={game.id} game={game} api={api} store={store} locale={locale} onClose={close} onBack={games.length > 1 ? () => setGame(null) : null} /> : (
               <div className="picker">
                 <Bulbs />
                 <h2 className="marquee">{ui.choose}</h2>
                 {games.map((g) => (
-                  <button key={g.id} className="pick" onClick={() => setGame(g)}>
+                  <button key={g.id} className="pick" onClick={() => { sound.play('chip'); setGame(g); }}>
                     <span className="pick-ico" aria-hidden="true">{GAME_TYPES[g.type]?.icon}</span>
                     <span className="pick-txt">{t(g.texts?.heading, locale) || g.name}<small>{GAME_TYPES[g.type]?.label}</small></span>
                   </button>
@@ -141,6 +147,20 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
         </div>
       )}
     </div>
+  );
+}
+
+// Mute / unmute all game sounds and music; the choice is remembered on this device.
+function SoundToggle({ locale }) {
+  const [muted, setMuted] = useState(sound.muted());
+  useEffect(() => sound.subscribe(setMuted), []);
+  const label = muted ? UI[locale].soundOn : UI[locale].soundOff;
+  return (
+    <button className="sound-toggle" aria-label={label} title={label} aria-pressed={!muted} onClick={() => sound.setMuted(!muted)}>
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" />
+        {muted ? <path d="M16 9l5 6M21 9l-5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          : <path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />}</svg>
+    </button>
   );
 }
 
@@ -185,12 +205,13 @@ function Play({ game, api, store, locale, onClose, onBack }) {
   const heading = t(game.texts?.heading, locale) || game.name;
   const sub = t(game.texts?.subheading, locale);
   const privacy = t(game.texts?.privacy, locale);
+  useEffect(() => { if (done && result && !result.lost) sound.play('congrats'); }, [done]);
 
   async function submit(e) {
     e.preventDefault();
     setError('');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return setError(ui.invalidEmail);
-    setBusy(true);
+    setBusy(true); sound.unlock(); sound.play('chip');
     try {
       const res = await fetch(`${api}/api/public/play`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },

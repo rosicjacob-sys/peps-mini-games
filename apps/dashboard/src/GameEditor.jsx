@@ -103,6 +103,29 @@ function Rewards({ game, reload }) {
   );
 }
 
+// Sound effects and background music. Players can always mute from the game window (remembered on their device).
+function SoundEditor({ value, onChange }) {
+  const s = { sfx: true, music: 'builtin', musicUrl: '', ...value };
+  const set = (patch) => onChange({ ...s, ...patch });
+  return (
+    <>
+      <h3>Sound</h3>
+      <p className="muted small">Sounds start only after the player opens the game, and they can mute them with the speaker button in the game window.</p>
+      <div className="row">
+        <label className="check"><input type="checkbox" checked={s.sfx} onChange={(e) => set({ sfx: e.target.checked })} /> Sound effects (wheel ticks, card deals, chips, fanfares)</label>
+      </div>
+      <div className="row">
+        <label>Background music<select value={s.music} onChange={(e) => set({ music: e.target.value })}>
+          <option value="builtin">Casino lounge (built-in)</option><option value="custom">My own music file</option><option value="off">Off</option></select></label>
+        {s.music === 'custom' && (
+          <label className="grow">Music file URL (MP3)<input type="url" value={s.musicUrl} onChange={(e) => set({ musicUrl: e.target.value })} placeholder="https://cdn.shopify.com/s/files/…/casino-lounge.mp3" />
+            <span className="help">Upload the file to Shopify (Content → Files) and paste its link. It loops quietly while the game is open.</span></label>
+        )}
+      </div>
+    </>
+  );
+}
+
 function Settings({ game, reload, section, back }) {
   const [g, setG] = useState({ ...game, texts: { heading: {}, subheading: {}, privacy: {}, triggerLabel: {}, privacyUrl: '', ...game.texts } });
   const [msg, setMsg] = useState(''); const [err, setErr] = useState('');
@@ -144,6 +167,7 @@ function Settings({ game, reload, section, back }) {
             <div className="chip" style={{ background: (!fixed && g.brand_accent) || th.accent, color: th.accentText }}>Play & Win</div>
             <div className="chip" style={{ background: th.surface, border: `1px solid ${th.border}`, color: th.text }}>Free Reta</div>
           </div>
+          <SoundEditor value={g.texts.sound} onChange={(v) => setT('sound', v)} />
         </>
       )}
       {section === 'intro' && <IntroEditor g={g} setT={setT} />}

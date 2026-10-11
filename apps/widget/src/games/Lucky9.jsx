@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { UI } from '@peps/shared';
 import { points, lucky9Round, lucky9Natural9 } from '@peps/shared/cards.js';
+import { sound } from '../sound.js';
 import { Card, Deck, wait, DEAL, DEAL_DONE, CARD_MS, useLanded } from './Card.jsx';
 
 // Lucky 9: closest to 9 wins. The player may draw a third card unless they hold a natural 9; the banker draws on
@@ -19,7 +20,7 @@ export default function Lucky9({ result, locale, onDone }) {
     setPhase('banker'); const round = lucky9Round(s, d);
     await wait(500); if (!alive.current) return; setReveal(true);
     if (round.banker.length > 2) { await wait(900); if (!alive.current) return; setBanker(round.banker); }
-    await wait(round.banker.length > 2 ? CARD_MS : 700); if (!alive.current) return; setOutcome(round.outcome); setPhase('done');
+    await wait(round.banker.length > 2 ? CARD_MS : 700); if (!alive.current) return; setOutcome(round.outcome); setPhase('done'); sound.play(round.outcome === 'win' ? 'win' : 'lose');
   }
   useEffect(() => { if (nat9) { const id = setTimeout(() => finish(false), DEAL_DONE + 600); return () => clearTimeout(id); } }, []);
   const win = outcome === 'win';
