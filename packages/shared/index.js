@@ -6,7 +6,13 @@ export const GAME_TYPES = {
   blackjack: { label: 'Blackjack', icon: '♠', fixedTheme: 'casino-purple' },
   wheel: { label: 'Prize Wheel', icon: '🎡', defaultTheme: 'burgundy' },
   slots: { label: 'Slot Machine', icon: '🎰', defaultTheme: 'emerald' },
+  color: { label: 'Color Game', icon: '🎲', defaultTheme: 'crimson', maxRewards: 6 },
+  lucky9: { label: 'Lucky 9', icon: '9', defaultTheme: 'emerald' },
+  baccarat: { label: 'Baccarat', icon: '♦', defaultTheme: 'black-gold' },
+  poker: { label: 'Poker', icon: '♣', defaultTheme: 'royal-blue' },
 };
+// every type except the wheel awards exactly one reward per play
+export const singleReward = (type) => type !== 'wheel';
 
 // Casino palettes. Every theme carries gold trim (rim); the accent is the button colour.
 // `brandAccent` on a game can still override `accent` if a client wants their colour on the buttons.
@@ -55,11 +61,15 @@ export const UI = {
     code: 'Your code', copy: 'Copy', copied: 'Copied!',
     oneUse: 'Single use. Expires', emailed: 'We also emailed this code to', close: 'Close',
     redeem: 'Enter this code in your cart to apply your reward.', spinHeading: 'Spin your reward',
-    choose: 'Choose your game', gateHeading: 'Enter to play', matchThree: 'Match three to win',
+    choose: 'Choose your game', gateHeading: 'Enter to play', otherGames: 'Other games', matchThree: 'Match three to win',
     already: 'You already played this week.', comeBack: 'Come back on', error: 'Something went wrong. Please try again.',
     paused: 'This game is not available right now.',
     hit: 'Hit', stand: 'Stand', dealer: 'Dealer', you: 'You', bust: 'Bust!',
     bjResult: { blackjack: 'Blackjack!', win: 'You win!', push: 'Push', loss: 'Dealer wins' }, bjNext: 'Spin for your reward',
+    color: { roll: 'ROLL THE DICE', rolling: 'Rolling…', board: 'Match two or three dice to win that prize', match: 'Your colour!' },
+    l9: { draw: 'Draw', stand: 'Stand', banker: 'Banker', you: 'You', natural: 'Natural', win: 'You win!', closest: 'Closest to 9 wins' },
+    bac: { pick: 'Place your bet', player: 'Player', banker: 'Banker', tie: 'Tie', pays: { player: 'pays 1:1', banker: 'pays 0.95:1', tie: 'pays 8:1' }, wins: { player: 'Player wins!', banker: 'Banker wins!', tie: 'It’s a tie!' }, yourBet: 'Your bet wins!' },
+    poker: { deal: 'DEAL', dealing: 'Dealing…', paytable: 'Paytable', hands: { pair: 'Pair', two_pair: 'Two Pair', three: 'Three of a Kind', straight: 'Straight', flush: 'Flush', full_house: 'Full House', four: 'Four of a Kind', straight_flush: 'Straight Flush' } },
   },
   fr: {
     play: 'Jouer et gagner', emailLabel: 'Votre courriel', emailPlaceholder: 'vous@exemple.com',
@@ -68,11 +78,15 @@ export const UI = {
     code: 'Votre code', copy: 'Copier', copied: 'Copié!',
     oneUse: 'Usage unique. Expire le', emailed: 'Nous avons aussi envoyé ce code à', close: 'Fermer',
     redeem: 'Entrez ce code dans votre panier pour appliquer votre récompense.', spinHeading: 'Tournez pour votre récompense',
-    choose: 'Choisissez votre jeu', gateHeading: 'Entrez pour jouer', matchThree: 'Alignez-en trois pour gagner',
+    choose: 'Choisissez votre jeu', gateHeading: 'Entrez pour jouer', otherGames: 'Autres jeux', matchThree: 'Alignez-en trois pour gagner',
     already: 'Vous avez déjà joué cette semaine.', comeBack: 'Revenez le', error: 'Une erreur est survenue. Veuillez réessayer.',
     paused: "Ce jeu n'est pas disponible pour le moment.",
     hit: 'Carte', stand: 'Rester', dealer: 'Croupier', you: 'Vous', bust: 'Dépassé!',
     bjResult: { blackjack: 'Blackjack!', win: 'Vous gagnez!', push: 'Égalité', loss: 'Le croupier gagne' }, bjNext: 'Tourner pour ma récompense',
+    color: { roll: 'LANCER LES DÉS', rolling: 'Lancer…', board: 'Deux ou trois dés de la même couleur gagnent ce prix', match: 'Votre couleur!' },
+    l9: { draw: 'Tirer', stand: 'Rester', banker: 'Banquier', you: 'Vous', natural: 'Naturel', win: 'Vous gagnez!', closest: 'Le plus proche de 9 gagne' },
+    bac: { pick: 'Placez votre mise', player: 'Joueur', banker: 'Banquier', tie: 'Égalité', pays: { player: 'paie 1:1', banker: 'paie 0,95:1', tie: 'paie 8:1' }, wins: { player: 'Le joueur gagne!', banker: 'Le banquier gagne!', tie: 'Égalité!' }, yourBet: 'Votre mise gagne!' },
+    poker: { deal: 'DISTRIBUER', dealing: 'Distribution…', paytable: 'Table des gains', hands: { pair: 'Paire', two_pair: 'Deux paires', three: 'Brelan', straight: 'Quinte', flush: 'Couleur', full_house: 'Main pleine', four: 'Carré', straight_flush: 'Quinte flush' } },
   },
 };
 

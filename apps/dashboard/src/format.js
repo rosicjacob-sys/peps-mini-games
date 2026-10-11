@@ -27,4 +27,4 @@ export function change(cur, prev) {
   return { ratio: r, dir: Math.abs(r) < 0.005 ? 'flat' : r > 0 ? 'up' : 'down' };
 }
 export const tr = (v) => (v && typeof v === 'object' ? v.en || v.fr || '' : v || '');
-export const TYPE_LABEL = { wheel: 'Prize Wheel', slots: 'Slot Machine', blackjack: 'Blackjack' };
+export const TYPE_LABEL = { wheel: 'Prize Wheel', slots: 'Slot Machine', blackjack: 'Blackjack', color: 'Color Game', lucky9: 'Lucky 9', baccarat: 'Baccarat', poker: 'Poker' };

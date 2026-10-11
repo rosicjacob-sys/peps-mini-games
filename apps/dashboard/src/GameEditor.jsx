@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from './api.js';
 import Overview from './pages/Overview.jsx';
-import { GAME_TYPES, THEMES, SLOT_ICONS, INTRO_DEFAULTS, themeFor, t } from '@peps/shared';
+import { GAME_TYPES, THEMES, SLOT_ICONS, INTRO_DEFAULTS, UI, themeFor, t, singleReward } from '@peps/shared';
+import { pokerTiers, COLORS } from '@peps/shared/cards.js';
 
 const TABS = ['Stats', 'Rewards', 'Intro popup', 'Appearance', 'Texts & Email'];
 const blankReward = () => ({ title: { en: '', fr: '' }, subtitle: { en: '', fr: '' }, code: '', probability: 0, active: true });
@@ -41,6 +42,9 @@ function Rewards({ game, reload }) {
   const [msg, setMsg] = useState(''); const [err, setErr] = useState('');
   const total = useMemo(() => rows.filter((r) => r.active).reduce((s, r) => s + (Number(r.probability) || 0), 0), [rows]);
   const set = (i, patch) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  // poker: which hand each reward is paid on; color game: which colour each active reward sits on
+  const tiers = game.type === 'poker' ? pokerTiers(rows.map((r, i) => ({ ...r, id: r.id || `new${i}`, sort: i }))) : {};
+  const colorOf = (i) => { if (game.type !== 'color' || !rows[i].active) return null; const k = rows.slice(0, i).filter((r) => r.active).length; return COLORS[k] || null; };
   const ok = Math.abs(total - 100) < 0.01;
   function equalise() {
     const n = rows.filter((r) => r.active).length;
@@ -54,7 +58,7 @@ function Rewards({ game, reload }) {
   }
   return (
     <>
-      <p className="muted">Each play, the server picks {game.type === 'blackjack' || game.type === 'slots' ? 1 : game.rewards_per_play} reward{game.type === 'wheel' && game.rewards_per_play > 1 ? 's' : ''} using these probabilities.{game.type === 'slots' && ' All three reels stop on the winning reward\'s symbol.'}{game.type === 'blackjack' && ' The player wins a warm-up hand, then spins a wheel; these probabilities decide where the wheel lands.'} Active rewards must add up to 100%. Codes must already exist in your discount app.</p>
+      <p className="muted">Each play, the server picks {singleReward(game.type) ? 1 : game.rewards_per_play} reward{game.type === 'wheel' && game.rewards_per_play > 1 ? 's' : ''} using these probabilities.{game.type === 'slots' && ' All three reels stop on the winning reward\'s symbol.'}{game.type === 'poker' && ' Each reward is paid on a poker hand: the more likely the reward, the weaker the hand.'}{game.type === 'color' && ' Each active reward sits on one of six colours, in this order.'}{['lucky9', 'baccarat'].includes(game.type) && ' The player wins the hand, then spins a wheel; these probabilities decide where it lands.'}{game.type === 'blackjack' && ' The player wins a warm-up hand, then spins a wheel; these probabilities decide where the wheel lands.'} Active rewards must add up to 100%. Codes must already exist in your discount app.</p>
       {rows.map((r, i) => (
         <div key={r.id || i} className={`card reward-row ${r.active ? '' : 'off'}`}>
           <Loc label="Title" value={r.title} onChange={(v) => set(i, { title: v })} ph="Free Reta" />
@@ -66,6 +70,9 @@ function Rewards({ game, reload }) {
               <label>Reel icon<select value={r.symbol || ''} onChange={(e) => set(i, { symbol: e.target.value || null })}>
                 <option value="">Auto</option>{SLOT_ICONS.map((x) => <option key={x.key} value={x.glyph}>{x.glyph} {x.label}</option>)}</select></label>
             )}
+            {game.type === 'poker' && r.active && <span className="pill">Paid on: {UI.en.poker.hands[tiers[r.id || `new${i}`]]}</span>}
+            {colorOf(i) && <span className="pill"><i className="dot" style={{ background: colorOf(i).hex }} />{colorOf(i).key}</span>}
+            {game.type === 'color' && r.active && !colorOf(i) && <span className="pill failed">no colour left (max 6)</span>}
             <label className="check"><input type="checkbox" checked={r.active} onChange={(e) => set(i, { active: e.target.checked })} /> Active</label>
             <button className="danger" onClick={() => setRows(rows.filter((_, j) => j !== i))}>Remove</button>
           </div>

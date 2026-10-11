@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
-import { GAME_TYPES, THEMES, SLOT_SYMBOLS, DEFAULT_THEME } from '@peps/shared';
+import { GAME_TYPES, THEMES, SLOT_SYMBOLS, DEFAULT_THEME, singleReward } from '@peps/shared';
 import { q, pool } from './db.js';
 
 export const adminRouter = Router();
@@ -96,7 +96,7 @@ function gameFields(b) {
   return {
     type: b.type, name: String(b.name || GAME_TYPES[b.type].label).slice(0, 80),
     status: b.status === 'paused' ? 'paused' : 'active', theme, brand,
-    per: ['blackjack', 'slots'].includes(b.type) ? 1 : Math.min(5, Math.max(1, parseInt(b.rewards_per_play, 10) || 1)),
+    per: singleReward(b.type) ? 1 : Math.min(5, Math.max(1, parseInt(b.rewards_per_play, 10) || 1)),
     texts: { heading: loc(tx.heading), subheading: loc(tx.subheading), privacy: loc(tx.privacy), triggerLabel: loc(tx.triggerLabel), privacyUrl: String(tx.privacyUrl || '').slice(0, 300), intro: cleanIntro(tx.intro) },
     from_name: String(b.from_name || '').slice(0, 120), from_email: String(b.from_email || '').trim().slice(0, 254), reply_to: String(b.reply_to || '').trim().slice(0, 254),
     subject: loc(b.email_subject),
@@ -129,6 +129,8 @@ adminRouter.put('/games/:id/rewards', wrap(async (req, res) => {
     probability: Math.max(0, Math.min(100, Number(r.probability) || 0)), active: r.active !== false, sort: i,
   }));
   if (clean.some((r) => !r.title.en || !r.code)) return res.status(400).json({ error: 'Every reward needs an English title and a code.' });
+  const max = GAME_TYPES[g.type]?.maxRewards;
+  if (max && clean.filter((r) => r.active).length > max) return res.status(400).json({ error: `${GAME_TYPES[g.type].label} has ${max} colours, so it can have at most ${max} active rewards.` });
   const total = clean.filter((r) => r.active).reduce((s, r) => s + r.probability, 0);
   if (clean.some((r) => r.active) && Math.abs(total - 100) > 0.01) return res.status(400).json({ error: `Active probabilities must add up to 100% (currently ${total.toFixed(2)}%).` });
 

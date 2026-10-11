@@ -1,20 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { UI } from '@peps/shared';
 import { handValue, canHit, playRound, isBlackjack } from '@peps/shared/blackjack.js';
+import { Card } from './Card.jsx';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-
-function Card({ c, hidden, delay = 0 }) {
-  if (hidden) return <div className="bj-card back" style={{ animationDelay: `${delay}ms` }} />;
-  const red = c.s === '♥' || c.s === '♦';
-  return (
-    <div className={`bj-card ${red ? 'red' : ''}`} style={{ animationDelay: `${delay}ms` }}>
-      <span className="ci tl">{c.r}<i>{c.s}</i></span>
-      <span className="cs">{c.s}</span>
-      <span className="ci br">{c.r}<i>{c.s}</i></span>
-    </div>
-  );
-}
 
 // Table dressing: the dealer's shoe (top right) and a chip stack (bottom left).
 const Shoe = () => <div className="bj-shoe" aria-hidden="true"><i /><i /><i /></div>;
