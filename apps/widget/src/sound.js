@@ -1,12 +1,13 @@
-// Casino sounds, made live with the Web Audio API: no audio files, nothing to license, nothing to download.
-// Effects (wheel ticks, card swishes, chips, reels, dice, fanfares) and a built-in lounge-jazz loop.
+// Game sounds, made live with the Web Audio API: no audio files, nothing to license, nothing to download.
+// Effects (wheel ticks, card swishes, chips, reels, dice, scratching, gift boxes, Plinko pegs, fanfares) and two
+// built-in loops: lounge jazz for casino games, a bouncy tune for arcade games.
 // A game can swap the loop for its own music file (texts.sound.musicUrl). The visitor's mute choice is remembered.
 
 const KEY = 'pg_sound';
 const read = () => { try { return localStorage.getItem(KEY); } catch { return null; } };
 let muted = read() === 'off';
 let ctx = null, out = null, fxBus = null, musicBus = null, noiseBuf = null;
-let cfg = { sfx: true, music: 'builtin', musicUrl: '' };
+let cfg = { sfx: true, music: 'builtin', musicUrl: '', style: 'casino' };
 let musicOn = false, track = null, el = null;
 const subs = new Set();
 
@@ -83,6 +84,22 @@ const FX = {
   },
 };
 
+// arcade effects
+Object.assign(FX, {
+  // a coin scraping the silver off a scratch card
+  scratch() { noise({ d: 0.07, v: 0.1, f: jitter(3800, 0.3), q: 1.2, a: 0.01 }); },
+  // a gift box rattling
+  shake() { for (let i = 0; i < 6; i++) { noise({ at: i * 0.07, d: 0.04, v: 0.16, f: 900 + Math.random() * 700, q: 2 }); tone({ f: jitter(220, 0.2), type: 'triangle', at: i * 0.07, d: 0.05, v: 0.08 }); } },
+  // the lid popping off
+  pop() { tone({ f: 380, f2: 1100, type: 'sine', d: 0.09, v: 0.3 }); noise({ d: 0.05, v: 0.18, type: 'highpass', f: 2500 }); for (let i = 0; i < 8; i++) tone({ f: 1600 + Math.random() * 2400, at: 0.08 + i * 0.045, a: 0.001, d: 0.18, v: 0.035 }); },
+  // the Plinko ball hitting a peg: a bright plink, a little higher as it falls
+  peg(row = 0) { const m = 76 + [0, 2, 4, 7, 9][Math.floor(Math.random() * 5)] + (row % 2 ? 12 : 0); tone({ f: hz(m), type: 'triangle', a: 0.002, d: 0.16, v: 0.13 }); tone({ f: hz(m + 19), a: 0.001, d: 0.06, v: 0.03 }); },
+  // the ball dropping into its slot
+  drop() { tone({ f: 260, f2: 120, d: 0.16, v: 0.35 }); noise({ d: 0.05, v: 0.14, type: 'lowpass', f: 900 }); },
+  // a tap on a playful button
+  boing() { tone({ f: 300, f2: 620, type: 'sine', d: 0.12, v: 0.18 }); },
+});
+
 // continuous sounds; each returns a stop function
 const LOOPS = {
   // spinning reels: a fast clatter
@@ -152,9 +169,51 @@ function playBar(bar, t) {
     at += Math.random() < 0.6 ? SW : BEAT;
   }
 }
-function builtinTrack() {
+// ---- built-in arcade music: a sunny, bouncy loop (I-V-vi-IV), marimba chords, hopping bass, claps and a hook
+const ABPM = 128, AB = 60 / ABPM;
+const ASONG = [
+  { root: 48, chord: [60, 64, 67], hook: [72, 76, 79, 76, 74, 72, 74, 76] },   // C
+  { root: 43, chord: [59, 62, 67], hook: [74, 79, 78, 79, 74, 71, 74, 79] },   // G
+  { root: 45, chord: [60, 64, 69], hook: [76, 72, 69, 72, 76, 79, 76, 72] },   // Am
+  { root: 41, chord: [60, 65, 69], hook: [77, 76, 74, 72, 74, 72, 69, 72] },   // F
+];
+function marimba(m, t, v, d = 0.35) {
+  [[1, v], [4, v * 0.25], [10, v * 0.05]].forEach(([mul, vol]) => {
+    const o = ctx.createOscillator(); o.frequency.value = hz(m) * mul;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + d / mul ** 0.3);
+    o.connect(g); g.connect(musicBus); o.start(t); o.stop(t + d + 0.05);
+  });
+}
+function hop(m, t) {
+  const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = hz(m);
+  const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(250, t + 0.18);
+  const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + AB * 0.45);
+  o.connect(f); f.connect(g); g.connect(musicBus); o.start(t); o.stop(t + AB * 0.5);
+}
+function hit(t, f, q, v, d) {
+  const s = ctx.createBufferSource(); s.buffer = noiseBuf;
+  const flt = ctx.createBiquadFilter(); flt.type = 'bandpass'; flt.frequency.value = f; flt.Q.value = q;
+  const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  s.connect(flt); flt.connect(g); g.connect(musicBus); s.start(t, Math.random() * 0.5); s.stop(t + d + 0.02);
+}
+function playArcadeBar(bar, t) {
+  const c = ASONG[bar % ASONG.length];
+  // bass hops root / octave on the eighths
+  for (let i = 0; i < 8; i++) hop(c.root + (i % 2 ? 12 : 0), t + i * AB / 2);
+  // marimba chords on the off-beats
+  [0.5, 1.5, 2.5, 3.5].forEach((b) => c.chord.forEach((m) => marimba(m, t + b * AB, 0.035, 0.25)));
+  // claps on 2 and 4, shaker on every eighth
+  [1, 3].forEach((b) => { hit(t + b * AB, 1500, 0.8, 0.12, 0.12); hit(t + b * AB + 0.012, 2200, 1, 0.06, 0.08); });
+  for (let i = 0; i < 8; i++) hit(t + i * AB / 2, 8000, 0.7, i % 2 ? 0.03 : 0.018, 0.04);
+  // the hook: on bars 3-4 of every 8, a few notes dropped so it breathes
+  const lead = Math.floor(bar / 4) % 2 === 1;
+  c.hook.forEach((m, i) => { if (lead || i % 2 === 0 || Math.random() < 0.3) marimba(m, t + i * AB / 2, lead ? 0.07 : 0.05, 0.4); });
+}
+function builtinTrack(style) {
+  const arcade = style === 'arcade';
+  const len = arcade ? 4 * AB : 4 * BEAT, play = arcade ? playArcadeBar : playBar;
   let bar = 0, next = ctx.currentTime + 0.1, stopped = false;
-  const tick = () => { if (stopped) return; while (next < ctx.currentTime + 0.6) { playBar(bar++, next); next += 4 * BEAT; } };
+  const tick = () => { if (stopped) return; while (next < ctx.currentTime + 0.6) { play(bar++, next); next += len; } };
   tick(); const id = setInterval(tick, 200);
   return () => { stopped = true; clearInterval(id); };
 }
@@ -169,15 +228,19 @@ function applyMusic() {
     el.play().catch(() => {});
   } else {
     el?.pause();
-    if (!track && init()) { musicBus.gain.cancelScheduledValues(ctx.currentTime); musicBus.gain.setValueAtTime(0.0001, ctx.currentTime); musicBus.gain.linearRampToValueAtTime(0.32, ctx.currentTime + 1.5); track = builtinTrack(); }
+    if (!track && init()) { musicBus.gain.cancelScheduledValues(ctx.currentTime); musicBus.gain.setValueAtTime(0.0001, ctx.currentTime); musicBus.gain.linearRampToValueAtTime(0.32, ctx.currentTime + 1.5); track = builtinTrack(cfg.style); }
   }
 }
 
 export const sound = {
   // call from a click/tap: browsers only allow audio after the visitor interacts
   unlock() { if (init() && ctx.state === 'suspended') ctx.resume(); },
-  configure(s = {}) { const was = cfg; cfg = { sfx: s.sfx !== false, music: ['off', 'custom'].includes(s.music) ? s.music : 'builtin', musicUrl: s.musicUrl || '' }; if (was.music !== cfg.music || was.musicUrl !== cfg.musicUrl) { track?.(); track = null; applyMusic(); } },
-  play(name) { try { if (fxOk() && FX[name]) FX[name](); } catch { /* sound is never worth an error */ } },
+  // `style` picks the built-in loop: 'casino' (lounge jazz) or 'arcade' (bouncy)
+  configure(s = {}, style = 'casino') {
+    const was = cfg; cfg = { sfx: s.sfx !== false, music: ['off', 'custom'].includes(s.music) ? s.music : 'builtin', musicUrl: s.musicUrl || '', style };
+    if (was.music !== cfg.music || was.musicUrl !== cfg.musicUrl || was.style !== cfg.style) { track?.(); track = null; applyMusic(); }
+  },
+  play(name, ...args) { try { if (fxOk() && FX[name]) FX[name](...args); } catch { /* sound is never worth an error */ } },
   loop(name) { try { return LOOPS[name] ? LOOPS[name]() : () => {}; } catch { return () => {}; } },
   music(on) { musicOn = on; applyMusic(); },
   muted: () => muted,

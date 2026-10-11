@@ -4,12 +4,12 @@ import Widget from './Widget.jsx';
 import css from './styles.css?inline';
 
 // Display face: "Coffee Tin" when self-hosted next to widget.js (public/fonts/coffee-tin.woff2),
-// otherwise "Rye" from Google Fonts - the same Tuscan casino look. Fonts are document-scoped,
+// otherwise "Rye" from Google Fonts - the same Tuscan casino look. Arcade games use "Fredoka". Fonts are document-scoped,
 // so both go in the host page's <head>.
 function loadFont(assetBase) {
   if (document.querySelector('link[data-peps-font]')) return;
   const l = document.createElement('link');
-  l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Rye&display=swap'; l.setAttribute('data-peps-font', '');
+  l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Rye&family=Fredoka:wght@400;500;600;700&display=swap'; l.setAttribute('data-peps-font', '');
   document.head.appendChild(l);
   if (assetBase) {
     const st = document.createElement('style');

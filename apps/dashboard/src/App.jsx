@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, hasToken, logout, WIDGET_URL } from './api.js';
-import { GAME_TYPES, themeFor } from '@peps/shared';
+import { GAME_TYPES, CATEGORIES, categoryOf, themeFor } from '@peps/shared';
 import GameEditor from './GameEditor.jsx';
 import Overview, { PageHead } from './pages/Overview.jsx';
 import Players from './pages/Players.jsx';
@@ -110,19 +110,30 @@ function Games({ open }) {
       {stores.length > 0 && (
         <form className="card toolbar-card" onSubmit={create}>
           <label>Store<select value={form.store_id} onChange={(e) => setForm({ ...form, store_id: e.target.value })}>{stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-          <label>Game type<select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>{Object.entries(GAME_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></label>
+          <label>Game type<select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+            {Object.entries(CATEGORIES).map(([c, cat]) => (
+              <optgroup key={c} label={`${cat.icon} ${cat.label.en}`}>
+                {Object.entries(GAME_TYPES).filter(([, v]) => v.category === c).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </optgroup>
+            ))}</select></label>
           <button className="primary">+ New game</button>{err && <span className="error">{err}</span>}
           <div className="search push"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.5" /><path d="M11 11l3.5 3.5" stroke="currentColor" strokeWidth="1.5" /></svg><input placeholder="Search games…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search games" /></div>
         </form>
       )}
-      <div className="game-grid">
-        {list.map((g) => {
+      {Object.entries(CATEGORIES).map(([c, cat]) => {
+        const inCat = list.filter((g) => categoryOf(g.type) === c);
+        if (!inCat.length) return null;
+        return (
+          <section key={c} className="game-section">
+            <h2 className="section-title"><span aria-hidden="true">{cat.icon}</span> {cat.label.en} games <span className="muted small">{cat.blurb}</span></h2>
+            <div className="game-grid">
+        {inCat.map((g) => {
           const th = themeFor(g.type, g.theme);
           return (
             <article key={g.id} className="game-card">
               <button className="gc-main" onClick={() => open(g.id)}>
-                <span className="gc-swatch" style={{ background: `radial-gradient(circle at 30% 30%, ${th.surface}, ${th.bg})`, borderColor: th.rim || th.border }}>
-                  <span style={{ color: th.rim || th.accent }}>{GAME_TYPES[g.type]?.icon}</span>
+                <span className="gc-swatch" style={th.grad ? { background: `linear-gradient(135deg, ${th.grad[0]}, ${th.grad[1]})`, borderColor: '#fff' } : { background: `radial-gradient(circle at 30% 30%, ${th.surface}, ${th.bg})`, borderColor: th.rim || th.border }}>
+                  <span style={{ color: th.grad ? '#fff' : th.rim || th.accent }}>{GAME_TYPES[g.type]?.icon}</span>
                 </span>
                 <span className="gc-text">
                   <b>{g.name}</b>
@@ -142,6 +153,9 @@ function Games({ open }) {
         })}
         {games && !list.length && <p className="muted">No games{q ? ' match' : ' yet'}.</p>}
       </div>
+          </section>
+        );
+      })}
     </>
   );
 }

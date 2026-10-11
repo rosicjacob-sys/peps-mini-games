@@ -77,9 +77,9 @@ function LibForm({ item, onCancel, onSaved, onDelete }) {
         <label>Subtitle (French)<input value={f.subtitle.fr} onChange={setL('subtitle', 'fr')} placeholder="Une fiole offerte" /></label>
         <label>Discount code<input value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} placeholder="FREERETA" />
           <span className="help">Must already exist in your discount app.</span></label>
-        <label>Slot machine icon<select value={f.symbol} onChange={(e) => setF({ ...f, symbol: e.target.value })}>
+        <label>Game icon<select value={f.symbol} onChange={(e) => setF({ ...f, symbol: e.target.value })}>
           <option value="">Auto</option>{SLOT_ICONS.map((x) => <option key={x.key} value={x.glyph}>{x.glyph} {x.label}</option>)}</select>
-          <span className="help">Used when this reward is on a slot machine.</span></label>
+          <span className="help">Shown on the slot machine, scratch card, gift boxes and Plinko.</span></label>
       </div>
       {err && <p className="error">{err}</p>}
       <div className="form-actions">

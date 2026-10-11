@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from './api.js';
 import Overview from './pages/Overview.jsx';
-import { GAME_TYPES, THEMES, INTRO_DEFAULTS, UI, themeFor, t, singleReward } from '@peps/shared';
+import { GAME_TYPES, THEMES, CATEGORIES, INTRO_DEFAULTS, UI, themeFor, themeCategory, categoryOf, t, singleReward } from '@peps/shared';
 import { pokerTiers, COLORS } from '@peps/shared/cards.js';
 
 const TABS = ['Stats', 'Rewards', 'Intro popup', 'Appearance', 'Texts & Email'];
@@ -63,7 +63,7 @@ function Rewards({ game, reload }) {
   }
   return (
     <>
-      <p className="muted">Each play, the server picks {singleReward(game.type) ? 1 : game.rewards_per_play} reward{game.type === 'wheel' && game.rewards_per_play > 1 ? 's' : ''} using these probabilities.{game.type === 'slots' && ' All three reels stop on the winning reward\'s symbol.'}{game.type === 'poker' && ' Each reward is paid on a poker hand: the more likely the reward, the weaker the hand.'}{game.type === 'color' && ' Each active reward sits on one of six colours, in this order.'}{['lucky9', 'baccarat'].includes(game.type) && ' The player wins the hand, then spins a wheel; these probabilities decide where it lands.'}{game.type === 'blackjack' && ' The player wins a warm-up hand, then spins a wheel; these probabilities decide where the wheel lands.'} Active rewards must add up to 100%. Codes must already exist in your discount app.</p>
+      <p className="muted">Each play, the server picks {singleReward(game.type) ? 1 : game.rewards_per_play} reward{game.type === 'wheel' && game.rewards_per_play > 1 ? 's' : ''} using these probabilities.{game.type === 'slots' && ' All three reels stop on the winning reward\'s symbol.'}{game.type === 'poker' && ' Each reward is paid on a poker hand: the more likely the reward, the weaker the hand.'}{game.type === 'color' && ' Each active reward sits on one of six colours, in this order.'}{['lucky9', 'baccarat'].includes(game.type) && ' The player wins the hand, then spins a wheel; these probabilities decide where it lands.'}{game.type === 'blackjack' && ' The player wins a warm-up hand, then spins a wheel; these probabilities decide where the wheel lands.'}{game.type === 'scratch' && ' The card has 6 spots showing reward icons; three matching icons win that reward. Pick each reward\'s icon in the library.'}{game.type === 'gifts' && ' The player picks one of three boxes; it holds the reward chosen here, and the other boxes show what else was possible.'}{game.type === 'plinko' && ' The ball always lands in a slot for the reward chosen here. Rewards (and "Try again" if the player can lose) share the 9 slots, shown by their library icon.'} Active rewards must add up to 100%. Codes must already exist in your discount app.</p>
       {rows.map((r, i) => (
         <div key={r.id || i} className={`card reward-row linked ${r.active ? '' : 'off'}`}>
           <div className="linked-head">
@@ -116,7 +116,7 @@ function SoundEditor({ value, onChange }) {
       </div>
       <div className="row">
         <label>Background music<select value={s.music} onChange={(e) => set({ music: e.target.value })}>
-          <option value="builtin">Casino lounge (built-in)</option><option value="custom">My own music file</option><option value="off">Off</option></select></label>
+          <option value="builtin">Built-in (lounge jazz for casino games, a bouncy tune for arcade games)</option><option value="custom">My own music file</option><option value="off">Off</option></select></label>
         {s.music === 'custom' && (
           <label className="grow">Music file URL (MP3)<input type="url" value={s.musicUrl} onChange={(e) => set({ musicUrl: e.target.value })} placeholder="https://cdn.shopify.com/s/files/…/casino-lounge.mp3" />
             <span className="help">Upload the file to Shopify (Content → Files) and paste its link. It loops quietly while the game is open.</span></label>
@@ -136,6 +136,7 @@ function Settings({ game, reload, section, back }) {
     try { await api.updateGame(g.id, g); setMsg('Saved'); reload(); } catch (e) { setErr(e.message); }
   }
   const th = themeFor(g.type, g.theme);
+  const cat = categoryOf(g.type);
   return (
     <div className="card form">
       {section === 'appearance' && (
@@ -145,24 +146,25 @@ function Settings({ game, reload, section, back }) {
             {g.type === 'wheel' && <label>Rewards per play<input className="num-in" type="number" min="1" max="5" value={g.rewards_per_play} onChange={(e) => setG({ ...g, rewards_per_play: e.target.value })} /></label>}
             <label className="grow">Internal name<input value={g.name} onChange={(e) => setG({ ...g, name: e.target.value })} /></label>
           </div>
-          <h3>Casino theme</h3>
+          <h3>{CATEGORIES[cat].label.en} theme</h3>
           {fixed ? <p className="muted">Blackjack keeps its signature purple-and-gold theme.</p> : (
             <>
               <div className="themes">
-                {Object.entries(THEMES).filter(([, v]) => !v.locked).map(([k, v]) => (
-                  <button key={k} className={`swatch ${g.theme === k ? 'on' : ''}`} onClick={() => setG({ ...g, theme: k })} style={{ background: v.bg, color: v.text, borderColor: v.border }}>
-                    <i style={{ background: v.accent }} /><i style={{ background: v.slices[1] }} /><span>{v.label}</span>
+                {Object.entries(THEMES).filter(([k, v]) => !v.locked && themeCategory(k) === cat).map(([k, v]) => (
+                  <button key={k} className={`swatch ${th === v ? 'on' : ''}`} onClick={() => setG({ ...g, theme: k })}
+                    style={v.grad ? { background: `linear-gradient(135deg, ${v.grad[0]}, ${v.grad[1]})`, color: '#fff', borderColor: '#fff', textShadow: '0 1px 2px rgba(0,0,0,.35)' } : { background: v.bg, color: v.text, borderColor: v.border }}>
+                    <i style={{ background: v.accent }} /><i style={{ background: v.grad ? v.bg : v.slices[1] }} /><span>{v.label}</span>
                   </button>
                 ))}
               </div>
               <div className="row">
-                <label>Brand accent colour <span className="muted">(optional, replaces the gold on buttons)</span>
+                <label>Brand accent colour <span className="muted">(optional, replaces the {cat === 'arcade' ? 'button colour' : 'gold on buttons'})</span>
                   <input type="color" value={g.brand_accent || th.accent} onChange={(e) => setG({ ...g, brand_accent: e.target.value })} /></label>
                 {g.brand_accent && <button className="link" onClick={() => setG({ ...g, brand_accent: null })}>Reset to neutral</button>}
               </div>
             </>
           )}
-          <div className="preview" style={{ background: th.bg, color: th.text, borderColor: th.border }}>
+          <div className="preview" style={{ background: th.grad ? `linear-gradient(135deg, ${th.grad[0]}, ${th.grad[1]})` : th.bg, color: th.grad ? '#fff' : th.text, borderColor: th.border }}>
             <b>Preview</b>
             <div className="chip" style={{ background: (!fixed && g.brand_accent) || th.accent, color: th.accentText }}>Play & Win</div>
             <div className="chip" style={{ background: th.surface, border: `1px solid ${th.border}`, color: th.text }}>Free Reta</div>
