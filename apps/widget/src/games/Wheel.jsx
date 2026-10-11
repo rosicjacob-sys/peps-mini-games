@@ -3,6 +3,7 @@ import { UI, t, themeFor } from '@peps/shared';
 import { sound } from '../sound.js';
 
 const R = 150;
+const WINDUP = 300, SPIN = 4700;   // ms: a 5 s spin from tap to stop
 const polar = (deg, r) => { const a = ((deg - 90) * Math.PI) / 180; return [R + r * Math.cos(a), R + r * Math.sin(a)]; };
 const CHAR = 0.63;          // bold sans glyph width ≈ 0.63 × font size (capitals are wide)
 const AVAIL = R * 0.6;      // radial room for a label, clear of the hub and the rim
@@ -85,14 +86,14 @@ export default function Wheel({ game, result, locale, onDone }) {
     spinningRef.current = true;
     // a short pull back, then the spin: quick to speed, a long smooth slow-down
     phase.current = 'windup';
-    setTurn({ rot: from - 14, tr: 'transform .3s cubic-bezier(.3,0,.4,1)' });
+    setTurn({ rot: from - 14, tr: `transform ${WINDUP}ms cubic-bezier(.3,0,.4,1)` });
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       phase.current = 'spin';
-      setTurn({ rot: next, tr: 'transform 5.6s cubic-bezier(.2,.62,.12,1)' });
+      setTurn({ rot: next, tr: `transform ${SPIN}ms cubic-bezier(.2,.62,.12,1)` });
       // transitionend can be skipped (background tab, reduced motion) - never leave the player stuck.
-      timer.current = setTimeout(ended, 6000);
-    }, 300);
+      timer.current = setTimeout(ended, SPIN + 400);
+    }, WINDUP);
     ticks(pegs);
   }
 

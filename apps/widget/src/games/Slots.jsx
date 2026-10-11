@@ -5,7 +5,7 @@ import { sound } from '../sound.js';
 const ROW = 84;            // px per tile
 const STRIP = 26;          // symbols per reel strip
 const TARGET_AT = 22;      // where the winning symbol sits in each strip
-const STOP = [3000, 3600, 4200]; // ms each reel takes - staggered stops; every spin lasts at least 3 s
+const STOP = [3800, 4300, 4800]; // ms each reel takes - staggered stops; with the pull, the spin lasts 5 s
 const PULL = 200;                // reels start as the lever comes down
 const LOCK = 0.93;               // share of a reel's time spent spinning; the rest is the settle back onto the line
 
