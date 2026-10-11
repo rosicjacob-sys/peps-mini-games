@@ -4,7 +4,7 @@
   border-radius: 999px; padding: 12px 20px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
 .trigger:hover { filter: brightness(1.08); }
 .overlay { position: fixed; inset: 0; z-index: 2147483001; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; padding: 16px; }
-.modal { position: relative; width: 100%; max-width: 420px; max-height: 92vh; overflow-y: auto; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 18px; padding: 28px 22px 22px; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+.modal { position: relative; width: 100%; max-width: 420px; max-height: 92vh; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 18px; padding: 28px 22px 22px; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
 .close { position: absolute; top: 8px; right: 12px; background: none; border: 0; color: var(--muted); font-size: 28px; line-height: 1; cursor: pointer; }
 .screen { display: flex; flex-direction: column; gap: 14px; text-align: center; }
 h2 { margin: 0; font-size: 24px; line-height: 1.2; }
@@ -22,7 +22,8 @@ p { margin: 0; }
 .fine a { color: var(--text); }
 .strong { color: var(--text); font-weight: 600; }
 .wheel-wrap { position: relative; display: flex; flex-direction: column; align-items: center; gap: 16px; padding-top: 14px; }
-.wheel { width: min(300px, 78vw); height: auto; filter: drop-shadow(0 6px 14px rgba(0,0,0,.25)); }
+.wheel-box { width: min(300px, 78vw); aspect-ratio: 1; border-radius: 50%; overflow: hidden; filter: drop-shadow(0 6px 14px rgba(0,0,0,.25)); }
+.wheel { display: block; width: 100%; height: 100%; }
 .pointer { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); z-index: 2; width: 0; height: 0;
   border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 22px solid var(--accent); filter: drop-shadow(0 2px 2px rgba(0,0,0,.4)); }
 .reward { border: 1px solid var(--border); background: var(--surface); border-radius: 14px; padding: 16px; }
