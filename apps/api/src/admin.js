@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
-import { GAME_TYPES, THEMES, SLOT_SYMBOLS, DEFAULT_THEME, singleReward } from '@peps/shared';
+import { GAME_TYPES, THEMES, SLOT_SYMBOLS, DEFAULT_THEME, ICON_TYPES, singleReward, themeCategory } from '@peps/shared';
 import { q, pool } from './db.js';
 
 export const adminRouter = Router();
@@ -96,7 +96,9 @@ const cleanSound = (s = {}) => {
 function gameFields(b) {
   if (!GAME_TYPES[b.type]) throw Object.assign(new Error('bad_type'), { status: 400 });
   const fixed = GAME_TYPES[b.type].fixedTheme;
-  const theme = fixed || (THEMES[b.theme] && !THEMES[b.theme].locked ? b.theme : (GAME_TYPES[b.type].defaultTheme || DEFAULT_THEME));
+  // a theme must belong to the game's category (casino games get casino themes, arcade games arcade ones)
+  const fits = THEMES[b.theme] && !THEMES[b.theme].locked && themeCategory(b.theme) === GAME_TYPES[b.type].category;
+  const theme = fixed || (fits ? b.theme : (GAME_TYPES[b.type].defaultTheme || DEFAULT_THEME));
   const brand = /^#[0-9a-f]{6}$/i.test(b.brand_accent || '') && !fixed ? b.brand_accent : null;
   const tx = b.texts || {};
   return {
@@ -133,14 +135,14 @@ adminRouter.put('/games/:id/rewards', wrap(async (req, res) => {
   const lib = new Map(libRows.map((x) => [x.id, x]));
   const clean = list.map((r, i) => (lib.has(r.library_id) ? { ...r, ...pickLib(lib.get(r.library_id), r) } : r)).map((r, i) => ({
     library_id: lib.has(r.library_id) ? r.library_id : null,
-    symbol: g.type === 'slots' && SLOT_SYMBOLS.includes(r.symbol) ? r.symbol : null,
+    symbol: ICON_TYPES.includes(g.type) && SLOT_SYMBOLS.includes(r.symbol) ? r.symbol : null,
     outcome: null, // legacy column: blackjack no longer maps a reward to a hand result
     id: r.id || null, title: loc(r.title), subtitle: loc(r.subtitle), code: String(r.code || '').trim().slice(0, 80),
     probability: Math.max(0, Math.min(100, Number(r.probability) || 0)), active: r.active !== false, sort: i,
   }));
   if (clean.some((r) => !r.library_id)) return res.status(400).json({ error: 'Rewards come from the rewards library. Add them with "+ Add from library".' });
   const max = GAME_TYPES[g.type]?.maxRewards;
-  if (max && clean.filter((r) => r.active).length > max) return res.status(400).json({ error: `${GAME_TYPES[g.type].label} has ${max} colours, so it can have at most ${max} active rewards.` });
+  if (max && clean.filter((r) => r.active).length > max) return res.status(400).json({ error: `${GAME_TYPES[g.type].label} can have at most ${max} active rewards${g.type === 'color' ? ' (one per colour)' : g.type === 'plinko' ? ' (they share the 9 slots)' : ''}.` });
   const lose = Math.max(0, Math.min(100, Number(req.body.lose_percent) || 0));
   const total = clean.filter((r) => r.active).reduce((s, r) => s + r.probability, 0) + lose;
   if ((clean.some((r) => r.active) || lose) && Math.abs(total - 100) > 0.01) return res.status(400).json({ error: `Active rewards plus "No reward" must add up to 100% (currently ${total.toFixed(2)}%).` });
@@ -186,8 +188,8 @@ adminRouter.put('/library/:id', wrap(async (req, res) => {
   const { rows } = await q('UPDATE reward_library SET title=$2, subtitle=$3, code=$4, symbol=$5 WHERE id=$1 RETURNING *', [req.params.id, f.title, f.subtitle, f.code, f.symbol]);
   if (!rows[0]) return res.sendStatus(404);
   const { rowCount } = await q(`UPDATE rewards r SET title=$2, subtitle=$3, code=$4,
-      symbol = CASE WHEN g.type = 'slots' AND $5::text IS NOT NULL THEN $5 ELSE r.symbol END
-    FROM games g WHERE g.id = r.game_id AND r.library_id = $1`, [req.params.id, f.title, f.subtitle, f.code, f.symbol]);
+      symbol = CASE WHEN g.type = ANY($6::text[]) AND $5::text IS NOT NULL THEN $5 ELSE r.symbol END
+    FROM games g WHERE g.id = r.game_id AND r.library_id = $1`, [req.params.id, f.title, f.subtitle, f.code, f.symbol, ICON_TYPES]);
   res.json({ ...rows[0], games_updated: rowCount });
 }));
 // Deleting a library reward removes it from every game using it; in each game its odds move to "No reward",

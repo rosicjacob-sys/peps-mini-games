@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { UI, INTRO_DEFAULTS, LOCALES, pickLocale, t, themeFor, GAME_TYPES, METALS } from '@peps/shared';
+import { UI, INTRO_DEFAULTS, LOCALES, pickLocale, t, themeFor, GAME_TYPES, METALS, CATEGORIES, POPS, categoryOf } from '@peps/shared';
 import Wheel from './games/Wheel.jsx';
 import Blackjack from './games/Blackjack.jsx';
 import Slots from './games/Slots.jsx';
@@ -7,11 +7,15 @@ import ColorGame from './games/ColorGame.jsx';
 import Lucky9 from './games/Lucky9.jsx';
 import Baccarat from './games/Baccarat.jsx';
 import Poker from './games/Poker.jsx';
+import ScratchCard from './games/ScratchCard.jsx';
+import GiftBoxes from './games/GiftBoxes.jsx';
+import Plinko from './games/Plinko.jsx';
 import Confetti from './Confetti.jsx';
 import { sound } from './sound.js';
 
 // Stages a play goes through before the result screen. Blackjack is a warm-up hand, then the wheel decides the reward.
-const GAMES = { wheel: [Wheel], blackjack: [Blackjack, Wheel], slots: [Slots], color: [ColorGame], lucky9: [Lucky9, Wheel], baccarat: [Baccarat, Wheel], poker: [Poker] };
+const GAMES = { wheel: [Wheel], blackjack: [Blackjack, Wheel], slots: [Slots], color: [ColorGame], lucky9: [Lucky9, Wheel], baccarat: [Baccarat, Wheel], poker: [Poker],
+  scratch: [ScratchCard], gifts: [GiftBoxes], plinko: [Plinko] };
 
 function cssVars(game) {
   const th = themeFor(game.type, game.theme);
@@ -25,6 +29,9 @@ function cssVars(game) {
     '--suit': accent.toLowerCase() === String(rim).toLowerCase() ? (th.accentText || '#1f1a0a') : rim,
     // headline fill: the theme's polished metal (gold, copper or silver), else the flat rim colour
     '--marquee': METALS[th.marquee] || `linear-gradient(${rim},${rim})`,
+    // arcade: the header gradient and the bright pieces
+    ...(th.grad ? { '--grad1': th.grad[0], '--grad2': th.grad[1] } : {}),
+    ...Object.fromEntries(POPS.flatMap((p, i) => [[`--pop${i + 1}`, p.bg], [`--pop${i + 1}-fg`, p.fg]])),
   };
 }
 
@@ -98,7 +105,7 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
 
   const current = game || games?.[0];
   // sounds follow the game on screen; music plays only while the game window is open
-  useEffect(() => { if (current) sound.configure(current.texts?.sound); }, [current?.id]);
+  useEffect(() => { if (current) sound.configure(current.texts?.sound, categoryOf(current.type)); }, [current?.id]);
   useEffect(() => { sound.music(open); return () => sound.music(false); }, [open]);
   const openGame = () => { sound.unlock(); setOpen(true); };
   // closing forgets the chosen game when the store has several, so "Play & Win" opens the picker again
@@ -121,26 +128,33 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
 
   if (!games?.length) return null;
   const label = t(current.texts?.triggerLabel, locale) || ui.play;
+  const arcade = categoryOf(current.type) === 'arcade';
+  // the picker lists games by family when the store has both
+  const families = Object.keys(CATEGORIES).map((c) => [c, games.filter((g) => categoryOf(g.type) === c)]).filter(([, l]) => l.length);
 
   return (
-    <div style={cssVars(current)}>
-      <button className="trigger" onClick={openGame}><span className="trigger-suit" aria-hidden="true">♠</span>{label}</button>
-      {intro && !open && <Intro game={current} locale={locale} setLocale={setLocale} onPlay={() => finishIntro(true)} onDecline={() => finishIntro(false)} />}
+    <div style={cssVars(current)} className={arcade ? 'pg-arcade' : 'pg-casino'}>
+      <button className="trigger" onClick={openGame}><span className="trigger-suit" aria-hidden="true">{arcade ? '🎁' : '♠'}</span>{label}</button>
+      {intro && !open && <Intro game={current} arcade={arcade} locale={locale} setLocale={setLocale} onPlay={() => finishIntro(true)} onDecline={() => finishIntro(false)} />}
       {open && (
         <div className="overlay" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && close()}>
           <div className="modal">
             <LangToggle locale={locale} setLocale={setLocale} />
             <SoundToggle locale={locale} />
             <button className="close" aria-label={ui.close} onClick={close}>×</button>
-            {game ? <Play key={game.id} game={game} api={api} store={store} locale={locale} onClose={close} onBack={games.length > 1 ? () => setGame(null) : null} /> : (
+            {game ? <Play key={game.id} game={game} arcade={arcade} api={api} store={store} locale={locale} onClose={close} onBack={games.length > 1 ? () => setGame(null) : null} /> : (
               <div className="picker">
-                <Bulbs />
-                <h2 className="marquee">{ui.choose}</h2>
-                {games.map((g) => (
-                  <button key={g.id} className="pick" onClick={() => { sound.play('chip'); setGame(g); }}>
-                    <span className="pick-ico" aria-hidden="true">{GAME_TYPES[g.type]?.icon}</span>
-                    <span className="pick-txt">{t(g.texts?.heading, locale) || g.name}<small>{GAME_TYPES[g.type]?.label}</small></span>
-                  </button>
+                <Head arcade={arcade} title={ui.choose} />
+                {families.map(([c, list]) => (
+                  <React.Fragment key={c}>
+                    {families.length > 1 && <p className="pick-cat"><span aria-hidden="true">{CATEGORIES[c].icon}</span> {t(CATEGORIES[c].label, locale)}</p>}
+                    {list.map((g) => (
+                      <button key={g.id} className={`pick pick-${c}`} onClick={() => { sound.play(categoryOf(g.type) === 'arcade' ? 'boing' : 'chip'); setGame(g); }}>
+                        <span className="pick-ico" aria-hidden="true">{GAME_TYPES[g.type]?.icon}</span>
+                        <span className="pick-txt">{t(g.texts?.heading, locale) || g.name}<small>{GAME_TYPES[g.type]?.label}</small></span>
+                      </button>
+                    ))}
+                  </React.Fragment>
                 ))}
               </div>
             )}
@@ -165,11 +179,29 @@ function SoundToggle({ locale }) {
   );
 }
 
+// Screen heading. Casino: twinkling marquee bulbs over a gold title (and card suits).
+// Arcade: a bright gradient banner across the top of the window with floating sparkles.
+function Head({ arcade, title, suits, bulbs = true, className = '', id }) {
+  if (arcade) return (
+    <div className="arcade-head">
+      <i className="spark s1" aria-hidden="true">✦</i><i className="spark s2" aria-hidden="true">●</i><i className="spark s3" aria-hidden="true">★</i><i className="spark s4" aria-hidden="true">✿</i><i className="spark s5" aria-hidden="true">✦</i>
+      <h2 id={id} className={`arcade-title ${className}`}>{title}</h2>
+    </div>
+  );
+  return (
+    <>
+      {bulbs && <Bulbs />}
+      <h2 id={id} className={`marquee ${className}`}>{title}</h2>
+      {suits && <div className="suits" aria-hidden="true"><span>♠</span><span>♥</span><span>♦</span><span>♣</span></div>}
+    </>
+  );
+}
+
 // A row of twinkling marquee bulbs.
 const Bulbs = () => <div className="bulbs" aria-hidden="true">{Array.from({ length: 11 }, (_, i) => <i key={i} style={{ animationDelay: `${(i % 3) * 0.33}s` }} />)}</div>;
 
 // "Play to Win" popup. Copy comes from the dashboard; blank fields fall back to the defaults.
-function Intro({ game, locale, setLocale, onPlay, onDecline }) {
+function Intro({ game, arcade, locale, setLocale, onPlay, onDecline }) {
   const cfg = game.texts?.intro || {};
   const d = INTRO_DEFAULTS[locale];
   const pick = (k) => t(cfg[k], locale) || d[k];
@@ -181,9 +213,7 @@ function Intro({ game, locale, setLocale, onPlay, onDecline }) {
         <LangToggle locale={locale} setLocale={setLocale} />
         <button className="close" aria-label={UI[locale].close} onClick={onDecline}>×</button>
         {cfg.image && <img className="intro-img" src={cfg.image} alt="" />}
-        <Bulbs />
-        <h2 id="pg-intro-title" className="marquee">{pick('heading')}</h2>
-        <div className="suits" aria-hidden="true"><span>♠</span><span>♥</span><span>♦</span><span>♣</span></div>
+        <Head arcade={arcade} id="pg-intro-title" title={pick('heading')} suits />
         <p className="intro-desc">{pick('description')}</p>
         <ol className="steps">{list.map((x, i) => <li key={i}><span>{i + 1}</span>{x}</li>)}</ol>
         <button className="btn play" onClick={onPlay} autoFocus>{pick('playLabel')}</button>
@@ -194,7 +224,7 @@ function Intro({ game, locale, setLocale, onPlay, onDecline }) {
   );
 }
 
-function Play({ game, api, store, locale, onClose, onBack }) {
+function Play({ game, arcade, api, store, locale, onClose, onBack }) {
   const ui = UI[locale];
   const stages = GAMES[game.type];
   const [stage, setStage] = useState(0);
@@ -234,10 +264,9 @@ function Play({ game, api, store, locale, onClose, onBack }) {
   if (!result) {
     return (
       <form className="screen gate" onSubmit={submit}>
-        {onBack && <button type="button" className="back-link" onClick={onBack}>← {ui.otherGames}</button>}
-        <Bulbs />
-        <h2 className="marquee">{heading}</h2>
-        <div className="suits" aria-hidden="true"><span>♠</span><span>♥</span><span>♦</span><span>♣</span></div>
+        {onBack && !arcade && <button type="button" className="back-link" onClick={onBack}>← {ui.otherGames}</button>}
+        <Head arcade={arcade} title={heading} suits />
+        {onBack && arcade && <button type="button" className="back-link" onClick={onBack}>← {ui.otherGames}</button>}
         {sub && <p className="muted">{sub}</p>}
         <label className="field">
           <span>{ui.emailLabel}</span>
@@ -256,13 +285,12 @@ function Play({ game, api, store, locale, onClose, onBack }) {
     const Stage = stages[stage];
     const next = () => (!result.lost && stage + 1 < stages.length ? setStage(stage + 1) : setDone(true));
     // a wheel that follows another stage gets its own heading
-    return <div className="screen"><h2 className="marquee">{stage > 0 ? ui.spinHeading : heading}</h2><Stage key={stage} game={game} result={result} locale={locale} onDone={next} /></div>;
+    return <div className="screen"><Head arcade={arcade} bulbs={false} title={stage > 0 ? ui.spinHeading : heading} /><Stage key={stage} game={game} result={result} locale={locale} onDone={next} /></div>;
   }
 
   if (result.lost) return (
     <div className="screen result lose">
-      <Bulbs />
-      <h2 className="marquee">{ui.lose.title}</h2>
+      <Head arcade={arcade} title={ui.lose.title} />
       <div className="lose-card">
         <p className="lose-when">{ui.lose.retry} <b>{result.nextPlayText}</b>.</p>
         <p>✉️ {ui.lose.promo}</p>
@@ -274,8 +302,7 @@ function Play({ game, api, store, locale, onClose, onBack }) {
   return (
     <div className="screen result">
       <Confetti />
-      <Bulbs />
-      <h2 className="congrats marquee">{ui.congrats}</h2>
+      <Head arcade={arcade} className="congrats" title={ui.congrats} />
       <p className="muted won">{result.rewards.length > 1 ? ui.yourRewards : ui.yourReward}</p>
       {result.rewards.map((r) => <RewardCard key={r.id} r={r} locale={locale} />)}
       <p className="redeem">🛒 {ui.redeem}</p>
