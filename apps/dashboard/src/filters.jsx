@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import { api } from './api.js';
 import { todayET, addDays, dowOf, fmtRange, TYPE_LABEL } from './format.js';
 
-// Date presets — all ET calendar days, inclusive.
+// Date presets - all ET calendar days, inclusive.
 export const PRESETS = [
   { key: 'today', label: 'Today', range: (t) => [t, t] },
   { key: 'yesterday', label: 'Yesterday', range: (t) => [addDays(t, -1), addDays(t, -1)] },

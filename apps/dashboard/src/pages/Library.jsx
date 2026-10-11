@@ -13,7 +13,7 @@ export default function Library() {
   // games using it lose the reward; in each, its odds move to "No reward" so the game still adds up to 100%
   const remove = async (x) => {
     const names = [...new Set(x.games.map((g) => `${g.game} · ${g.store}`))];
-    const used = x.used_in ? `\n\nIt will also be removed from ${names.length === 1 ? 'this game' : `these ${names.length} games`}: ${names.slice(0, 3).join(', ')}${names.length > 3 ? `, +${names.length - 3} more` : ''}. Its chance moves to "No reward" in ${names.length === 1 ? 'that game' : 'each game'} — adjust the odds in the game's Rewards tab if you want it to go elsewhere.` : '';
+    const used = x.used_in ? `\n\nIt will also be removed from ${names.length === 1 ? 'this game' : `these ${names.length} games`}: ${names.slice(0, 3).join(', ')}${names.length > 3 ? `, +${names.length - 3} more` : ''}. Its chance moves to "No reward" in ${names.length === 1 ? 'that game' : 'each game'}. Adjust the odds in the game's Rewards tab if you want it to go elsewhere.` : '';
     if (!confirm(`Delete "${x.title.en}" from the library?${used}`)) return false;
     try {
       const r = await api.deleteLibrary(x.id);
@@ -35,7 +35,7 @@ export default function Library() {
       )}
       <div className="lib-grid">
         {list.map((x) => editing === x.id
-          ? <LibForm key={x.id} item={x} onDelete={() => remove(x)} onCancel={() => setEditing(null)} onSaved={(r) => { setEditing(null); setNote(r?.games_updated ? `Saved — ${r.games_updated} game reward${r.games_updated === 1 ? '' : 's'} updated.` : 'Saved.'); load(); }} />
+          ? <LibForm key={x.id} item={x} onDelete={() => remove(x)} onCancel={() => setEditing(null)} onSaved={(r) => { setEditing(null); setNote(r?.games_updated ? `Saved. ${r.games_updated} game reward${r.games_updated === 1 ? '' : 's'} updated.` : 'Saved.'); load(); }} />
           : (
             <article key={x.id} className="card lib-card">
               <div className="lib-top">

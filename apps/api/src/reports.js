@@ -120,7 +120,7 @@ export function registerReports(router, wrap, csvCell) {
     const gpm = new Map(gpl.rows.map((x) => [x.game_id, x.n]));
     for (const x of rw.rows) x.game_plays = gpm.get(x.game_id) || 0;
     // losses ("no reward") as their own row per game, compared with the lose chance that is set
-    for (const g of gpl.rows) if (g.lost || g.lose_percent > 0) rw.rows.push({ reward_id: `lost:${g.game_id}`, lost: true, title: { en: 'No reward (lost)', fr: 'Aucune récompense' }, code: '—',
+    for (const g of gpl.rows) if (g.lost || g.lose_percent > 0) rw.rows.push({ reward_id: `lost:${g.game_id}`, lost: true, title: { en: 'No reward (lost)', fr: 'Aucune récompense' }, code: '-',
       game_id: g.game_id, game: g.game, type: g.type, store: g.store, won: g.lost, players: null, probability: g.lose_percent, active: true, game_plays: g.n });
 
     // fill empty buckets so the time axis is continuous

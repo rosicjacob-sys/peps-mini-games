@@ -6,7 +6,7 @@ import { buildScript } from '@peps/shared/blackjack.js';
 import { buildLucky9, buildBaccarat, buildPokerHand, pokerTiers, colorDice } from '@peps/shared/cards.js';
 import { singleReward } from '@peps/shared';
 import { q, pool } from './db.js';
-import { weekInfo, normalizeEmail, pickRewards, hashIp, formatExpiry, formatDate, secureRandom, isTestEmail } from './lib.js';
+import { weekInfo, normalizeEmail, pickRewards, hashIp, formatDate, secureRandom, isTestEmail } from './lib.js';
 import crypto from 'node:crypto';
 import { buildEmail, sendEmail } from './email.js';
 
@@ -27,7 +27,7 @@ async function storeByKey(key, origin) {
 const publicGame = (g, rewards) => { const tiers = g.type === 'poker' ? pokerTiers(rewards) : null; return {
   id: g.id, type: g.type, name: g.name, theme: g.theme, brandAccent: g.brand_accent,
   rewardsPerPlay: g.rewards_per_play, texts: g.texts, canLose: Number(g.lose_percent) > 0,
-  // titles only — never codes or probabilities
+  // titles only - never codes or probabilities
   rewards: rewards.map((r) => ({ id: r.id, title: r.title, subtitle: r.subtitle, symbol: r.symbol, ...(tiers ? { hand: tiers[r.id] } : {}) })),
 }; };
 
@@ -89,7 +89,7 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
   } finally { client.release(); }
 
   // Email is sent after responding so the player is never blocked by Resend. A loss sends nothing.
-  if (!lost) sendEmail({ game, to: mail.email, mail: buildEmail({ game, rewards: picks, locale, expiresAt: week.expiresAt }) })
+  if (!lost) sendEmail({ game, to: mail.email, mail: buildEmail({ game, rewards: picks, locale }) })
     .then((r) => q('UPDATE plays SET email_status = $2, email_error = $3, last_email_at = now() WHERE id = $1', [playId, r.ok ? 'sent' : 'failed', r.ok ? null : r.error]))
     .catch((e) => { console.error(e); return q("UPDATE plays SET email_status = 'failed', email_error = $2, last_email_at = now() WHERE id = $1", [playId, String(e.message || e).slice(0, 300)]); });
 
@@ -109,6 +109,5 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
     // color game: dice for the winning reward's colour (its position on the board); a loss shows three colours
     ...(game.type === 'color' ? { script: { dice: colorDice(lost ? -1 : rewards.findIndex((r) => r.id === picks[0].id), rewards.length, secureRandom) } } : {}),
     expiresAt: week.expiresAt,
-    expiresText: formatExpiry(week.expiresAt, locale),
   });
 });

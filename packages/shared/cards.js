@@ -53,7 +53,7 @@ export function baccaratResolve(shoe) {
   const p = points(player), b = points(banker);
   return { player, banker, p, b, winner: p > b ? 'player' : b > p ? 'banker' : 'tie' };
 }
-// One deal per possible bet: won by that bet ('win'), or lost by it ('loss' — the other side wins; a Player or
+// One deal per possible bet: won by that bet ('win'), or lost by it ('loss' - the other side wins; a Player or
 // Banker bet never loses to a tie). The banker never finishes on 9.
 export function buildBaccarat(target = 'win', rand = Math.random) {
   if (typeof target === 'function') { rand = target; target = 'win'; }

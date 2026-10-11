@@ -38,7 +38,7 @@ export default function ColorGame({ game, result, locale, onDone }) {
           return (
             <div key={c.key} className={`cg-cell ${!r ? 'empty' : ''} ${done && i === win ? 'won' : ''}`} style={{ '--cg': c.hex }}>
               <span className="cg-swatch" aria-hidden="true" />
-              <span className="cg-label">{r ? t(r.title, locale) : '—'}</span>
+              <span className="cg-label">{r ? t(r.title, locale) : '-'}</span>
             </div>
           );
         })}

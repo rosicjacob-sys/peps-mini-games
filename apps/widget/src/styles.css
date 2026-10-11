@@ -14,7 +14,7 @@
     repeating-linear-gradient(45deg, rgba(255,255,255,.025) 0 2px, transparent 2px 5px),
     radial-gradient(ellipse at 50% -10%, color-mix(in srgb, var(--rim) 22%, transparent), transparent 55%),
     radial-gradient(ellipse at 50% 40%, color-mix(in srgb, var(--surface) 80%, var(--bg)), var(--bg) 100%);
-  border: 2px solid var(--rim); border-radius: 18px; padding: 28px 22px 22px;
+  border: 2px solid var(--rim); border-radius: 18px; padding: 56px 22px 22px;
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--rim) 22%, transparent), 0 24px 70px rgba(0,0,0,.55), inset 0 0 50px rgba(0,0,0,.35); }
 .close { color: var(--rim); }
 .close { position: absolute; top: 8px; right: 12px; background: none; border: 0; color: var(--rim); font-size: 28px; line-height: 1; cursor: pointer; }
@@ -69,9 +69,8 @@ p { margin: 0; }
 .code-row { display: flex; gap: 8px; justify-content: center; align-items: center; margin-top: 6px; }
 code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 22px; font-weight: 800; letter-spacing: .05em; background: rgba(0,0,0,.35); border: 1px dashed var(--rim); border-radius: 8px; padding: 4px 10px; }
 .copy { background: var(--rim); border: 0; color: var(--rim-text); border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 700; cursor: pointer; }
-@media (prefers-reduced-motion: reduce) { .wheel-spin { transition-duration: 1s !important; } }
 
-/* blackjack — a real table: wooden rail, purple felt, gold racetrack, shoe and chips */
+/* blackjack - a real table: wooden rail, purple felt, gold racetrack, shoe and chips */
 .bj { display: flex; flex-direction: column; gap: 14px; align-items: stretch; }
 .bj-table { padding: 9px; border-radius: 26px 26px 190px 190px / 26px 26px 150px 150px;
   background: linear-gradient(180deg, #6b4423 0%, #3d2410 45%, #5a3719 100%);
@@ -108,7 +107,7 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 22px; f
 @keyframes deal { from { opacity: 0; transform: translate(130px, -110px) rotate(18deg); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .bj-card { animation: none; } }
 
-/* slots — a cabinet: gold frame, chrome reel bezels, lever on the right */
+/* slots - a cabinet: gold frame, chrome reel bezels, lever on the right */
 .slots { display: flex; flex-direction: column; gap: 14px; align-items: stretch; padding-top: 4px; }
 .slots-hint { margin-top: -6px; }
 .cabinet { display: flex; align-items: center; gap: 8px; }

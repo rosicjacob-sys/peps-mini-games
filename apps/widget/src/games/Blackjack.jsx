@@ -76,7 +76,7 @@ export default function Blackjack({ result, locale, onDone }) {
         <ArcText text={locale === 'fr' ? 'LE CROUPIER RESTE À 17' : 'DEALER STANDS ON 17'} />
         <div className="bj-row">
           <div className="bj-cards">{player.map((c, i) => <Card key={`p${i}`} c={c} delay={i === 0 ? DEAL[0] : i === 1 ? DEAL[2] : 0} />)}</div>
-          <div className="bj-label">{ui.you} {ready ? <b>{pv}</b> : null}{bust || pv > 21 ? ` — ${ui.bust}` : ''}</div>
+          <div className="bj-label">{ui.you} {ready ? <b>{pv}</b> : null}{bust || pv > 21 ? ` · ${ui.bust}` : ''}</div>
         </div>
         </div>
       </div>
