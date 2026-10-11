@@ -34,6 +34,7 @@
 
 /* ===== base ===== */
 * { box-sizing: border-box; }
+html, body { overflow-x: hidden; }
 body { margin: 0; background: var(--page); color: var(--ink); font-size: 14px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
 h1 { font-size: 24px; line-height: 1.2; margin: 0; letter-spacing: -.01em; }
 h2 { font-size: 15px; margin: 0; font-weight: 650; }
@@ -73,7 +74,7 @@ button.icon { padding: 4px 9px; }
 pre { background: var(--surface-2); padding: 12px; border-radius: 8px; overflow: auto; cursor: copy; font-size: 12px; }
 
 /* ===== shell ===== */
-.shell { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+.shell { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100vh; }
 .sidebar { position: sticky; top: 0; height: 100vh; background: var(--side); color: var(--side-ink); display: flex; flex-direction: column; padding: 18px 12px; gap: 18px; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px; }
 .brand b { display: block; font-size: 15px; color: #fff; } .brand small { color: var(--side-muted); font-size: 12px; }
@@ -90,7 +91,7 @@ pre { background: var(--surface-2); padding: 12px; border-radius: 8px; overflow:
 .side-foot .link { color: var(--side-muted); align-self: flex-start; }
 .sidebar .segmented { background: var(--side-on); border-color: transparent; }
 .sidebar .segmented button { color: var(--side-muted); } .sidebar .segmented button.on { background: #2a3530; color: #fff; }
-.main { padding: 28px 32px 64px; max-width: 1440px; width: 100%; }
+.main { padding: 28px 32px 64px; max-width: 1440px; width: 100%; min-width: 0; }
 
 /* ===== page ===== */
 .page-head { display: flex; align-items: flex-end; gap: 16px; justify-content: space-between; margin-bottom: 18px; }
@@ -267,7 +268,7 @@ td > .pill:first-child { margin-left: 0; }
 @media (max-width: 1280px) { .kpis { grid-template-columns: repeat(3, 1fr); } .g-1-1-2 { grid-template-columns: 1fr 1fr; } .g-1-1-2 > :last-child { grid-column: 1 / -1; } }
 @media (max-width: 1080px) { .g-2-1, .g-2, .g-3, .g-1-2 { grid-template-columns: 1fr; } .g-4 { grid-template-columns: repeat(2, 1fr); } .reward-games { grid-template-columns: 1fr; } }
 @media (max-width: 860px) {
-  .shell { grid-template-columns: 1fr; }
+  .shell { grid-template-columns: minmax(0, 1fr); }
   .sidebar { position: sticky; z-index: 40; height: auto; padding: 10px 14px; flex-direction: column; gap: 0; }
   .menu-btn { display: inline-block; }
   .sidebar nav, .side-foot { display: none; }
@@ -300,10 +301,11 @@ td > .pill:first-child { margin-left: 0; }
 .optional { font-weight: 400; color: var(--muted); margin-left: 4px; }
 .form-actions { display: flex; gap: 8px; align-items: center; margin-top: 16px; }
 .steps-list { margin: 0; padding: 0; list-style: none; counter-reset: s; display: flex; flex-direction: column; gap: 14px; }
-.steps-list li { counter-increment: s; display: grid; grid-template-columns: 28px 1fr; column-gap: 12px; row-gap: 4px; }
+.steps-list li { counter-increment: s; display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 12px; row-gap: 4px; }
 .steps-list li::before { content: counter(s); grid-row: span 2; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--primary); color: var(--primary-ink); font-weight: 700; font-size: 13px; }
 .steps-list li > * { grid-column: 2; }
 .snippet { display: flex; gap: 10px; align-items: center; background: var(--raised); border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 10px 10px 12px; margin-top: 6px; }
-.snippet code { flex: 1; background: none; margin: 0; padding: 0; white-space: nowrap; overflow-x: auto; font-size: 12px; }
+.snippet code { flex: 1; min-width: 0; background: none; margin: 0; padding: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.6; }
+.snippet button { flex: none; align-self: flex-start; }
 .empty-state { text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 36px; }
 @media (max-width: 860px) { .form-grid { grid-template-columns: 1fr; } .store-actions { width: 100%; } .store-actions button { flex: 1; } }
