@@ -38,7 +38,7 @@ export const UI = {
   en: {
     play: 'Play & Win', emailLabel: 'Your email', emailPlaceholder: 'you@example.com',
     start: 'Play now', sending: 'Please wait…', invalidEmail: 'Please enter a valid email address.',
-    spin: 'SPIN', spinning: 'Spinning…', yourReward: 'You won!', yourRewards: 'You won!',
+    spin: 'SPIN', spinning: 'Spinning…', yourReward: 'You won!', yourRewards: 'You won!', congrats: 'Congratulations!',
     code: 'Your code', copy: 'Copy', copied: 'Copied!',
     oneUse: 'Single use. Expires', emailed: 'We also emailed this code to', close: 'Close',
     already: 'You already played this week.', comeBack: 'Come back on', error: 'Something went wrong. Please try again.',
@@ -49,13 +49,31 @@ export const UI = {
   fr: {
     play: 'Jouer et gagner', emailLabel: 'Votre courriel', emailPlaceholder: 'vous@exemple.com',
     start: 'Jouer', sending: 'Veuillez patienter…', invalidEmail: 'Veuillez entrer une adresse courriel valide.',
-    spin: 'TOURNER', spinning: 'Rotation…', yourReward: 'Vous avez gagné!', yourRewards: 'Vous avez gagné!',
+    spin: 'TOURNER', spinning: 'Rotation…', yourReward: 'Vous avez gagné!', yourRewards: 'Vous avez gagné!', congrats: 'Félicitations!',
     code: 'Votre code', copy: 'Copier', copied: 'Copié!',
     oneUse: 'Usage unique. Expire le', emailed: 'Nous avons aussi envoyé ce code à', close: 'Fermer',
     already: 'Vous avez déjà joué cette semaine.', comeBack: 'Revenez le', error: 'Une erreur est survenue. Veuillez réessayer.',
     paused: "Ce jeu n'est pas disponible pour le moment.",
     hit: 'Carte', stand: 'Rester', dealer: 'Croupier', you: 'Vous', bust: 'Dépassé!',
     bjResult: { blackjack: 'Blackjack!', win: 'Vous gagnez!', push: 'Égalité', loss: 'Le croupier gagne' }, bjNext: 'Récupérer ma récompense',
+  },
+};
+
+// Default copy for the "Play to Win" intro popup. Every field is editable per game in the dashboard.
+export const INTRO_DEFAULTS = {
+  en: {
+    heading: 'Play to Win!',
+    description: 'Play a quick game for a chance to win exclusive discount codes, free gifts and other exciting rewards.',
+    steps: ['Enter your email address', 'Play the game', "Get your reward code instantly — we'll email it to you too"],
+    note: 'Everyone who plays gets a reward. Codes are single-use and expire every Sunday at 11:59 PM ET. One play per week.',
+    playLabel: 'Play now', declineLabel: 'No thanks',
+  },
+  fr: {
+    heading: 'Jouez pour gagner!',
+    description: 'Jouez à un jeu rapide pour courir la chance de gagner des codes de réduction exclusifs, des cadeaux gratuits et d’autres récompenses intéressantes.',
+    steps: ['Entrez votre adresse courriel', 'Jouez au jeu', 'Recevez votre code tout de suite — nous vous l’envoyons aussi par courriel'],
+    note: 'Tous les participants reçoivent une récompense. Les codes sont à usage unique et expirent chaque dimanche à 23 h 59 (HE). Une partie par semaine.',
+    playLabel: 'Jouer maintenant', declineLabel: 'Non merci',
   },
 };
 

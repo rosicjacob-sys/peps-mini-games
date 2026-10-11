@@ -21,7 +21,17 @@ adminRouter.use((req, res, next) => {
 });
 
 const wrap = (fn) => (req, res, next) => fn(req, res, next).catch(next);
-const loc = (v) => ({ en: String(v?.en ?? '').slice(0, 300), fr: String(v?.fr ?? '').slice(0, 300) });
+const loc = (v, max = 300) => ({ en: String(v?.en ?? '').slice(0, max), fr: String(v?.fr ?? '').slice(0, max) });
+
+function cleanIntro(i = {}) {
+  return {
+    enabled: i.enabled !== false,
+    heading: loc(i.heading), description: loc(i.description, 600), note: loc(i.note, 400),
+    steps: (Array.isArray(i.steps) ? i.steps : []).slice(0, 6).map((x) => loc(x, 200)).filter((x) => x.en || x.fr),
+    playLabel: loc(i.playLabel, 60), declineLabel: loc(i.declineLabel, 60),
+    image: /^https:\/\//.test(i.image || '') ? String(i.image).slice(0, 500) : '',
+  };
+}
 
 // ---- stores
 adminRouter.get('/stores', wrap(async (_req, res) => {
@@ -66,7 +76,7 @@ function gameFields(b) {
     type: b.type, name: String(b.name || GAME_TYPES[b.type].label).slice(0, 80),
     status: b.status === 'paused' ? 'paused' : 'active', theme, brand,
     per: ['blackjack', 'slots'].includes(b.type) ? 1 : Math.min(5, Math.max(1, parseInt(b.rewards_per_play, 10) || 1)),
-    texts: { heading: loc(tx.heading), subheading: loc(tx.subheading), privacy: loc(tx.privacy), triggerLabel: loc(tx.triggerLabel), privacyUrl: String(tx.privacyUrl || '').slice(0, 300) },
+    texts: { heading: loc(tx.heading), subheading: loc(tx.subheading), privacy: loc(tx.privacy), triggerLabel: loc(tx.triggerLabel), privacyUrl: String(tx.privacyUrl || '').slice(0, 300), intro: cleanIntro(tx.intro) },
     from_name: String(b.from_name || '').slice(0, 120), from_email: String(b.from_email || '').trim().slice(0, 254), reply_to: String(b.reply_to || '').trim().slice(0, 254),
     subject: loc(b.email_subject),
   };

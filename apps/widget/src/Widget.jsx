@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { UI, pickLocale, t, themeFor, GAME_TYPES } from '@peps/shared';
+import { UI, INTRO_DEFAULTS, LOCALES, pickLocale, t, themeFor, GAME_TYPES } from '@peps/shared';
 import Wheel from './games/Wheel.jsx';
 import Blackjack from './games/Blackjack.jsx';
 import Slots from './games/Slots.jsx';
+import Confetti from './Confetti.jsx';
 
 const GAMES = { wheel: Wheel, blackjack: Blackjack, slots: Slots };
 
@@ -15,11 +16,59 @@ function cssVars(game) {
   };
 }
 
-export default function Widget({ store, api, locale: rawLocale, gameType }) {
-  const locale = pickLocale(rawLocale);
+const DEFAULT_GATE = '[id*="age-gate"],[class*="age-gate"],[data-age-gate]';
+const store_ = (fn) => { try { return fn(); } catch { return null; } };
+
+// Language: the visitor's choice (toggle) wins, then the page / script setting.
+function initialLocale(raw) {
+  const saved = store_(() => localStorage.getItem('pg_locale'));
+  return LOCALES.includes(saved) ? saved : pickLocale(raw);
+}
+
+// The intro only shows on the homepage (/, or a language/market root like /fr, /en-ca).
+const isHome = () => /^\/(?:[a-z]{2}(?:-[a-z]{2})?)?\/?$/i.test(location.pathname);
+
+const playedUntil = (gameId) => store_(() => localStorage.getItem(`pg_played_${gameId}`));
+const playedThisWeek = (gameId) => { const v = playedUntil(gameId); return !!v && Date.now() < new Date(v).getTime(); };
+
+function gateBlocking(sel) {
+  let els = [];
+  try { els = document.querySelectorAll(sel); } catch { return false; }
+  for (const el of els) {
+    if (el.hidden || el.getAttribute('data-open') === 'false') continue;
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+    return true;
+  }
+  return false;
+}
+
+// Calls `cb` once the age-verification dialog is gone. While it is open (or the visitor was denied,
+// so it never closes) the intro never appears.
+function whenAgeGateClear(sel, cb) {
+  let clear = 0;
+  const id = setInterval(() => {
+    clear = gateBlocking(sel) ? 0 : clear + 1;
+    if (clear >= 2) { clearInterval(id); cb(); }
+  }, 200);
+  return () => clearInterval(id);
+}
+
+function LangToggle({ locale, setLocale }) {
+  return (
+    <div className="lang" role="group" aria-label="Language">
+      {LOCALES.map((l) => <button key={l} className={l === locale ? 'on' : ''} aria-pressed={l === locale} onClick={() => setLocale(l)}>{l.toUpperCase()}</button>)}
+    </div>
+  );
+}
+
+export default function Widget({ store, api, locale: rawLocale, gameType, ageSelector, introPages }) {
+  const [locale, setLocaleState] = useState(() => initialLocale(rawLocale));
+  const setLocale = (l) => { setLocaleState(l); store_(() => localStorage.setItem('pg_locale', l)); };
   const ui = UI[locale];
   const [games, setGames] = useState(null);
   const [open, setOpen] = useState(false);
+  const [intro, setIntro] = useState(false);
   const [game, setGame] = useState(null);
 
   useEffect(() => {
@@ -33,16 +82,34 @@ export default function Widget({ store, api, locale: rawLocale, gameType }) {
       .catch(() => setGames([]));
   }, [store, api, gameType]);
 
+  const current = game || games?.[0];
+
+  // Intro popup: homepage only, every visit (once per browser session), straight after age verification.
+  useEffect(() => {
+    if (!current) return;
+    if (current.texts?.intro?.enabled === false) return;
+    if (introPages !== 'all' && !isHome()) return;
+    if (store_(() => sessionStorage.getItem('pg_intro_done')) || playedThisWeek(current.id)) return;
+    return whenAgeGateClear(ageSelector || DEFAULT_GATE, () => setIntro(true));
+  }, [current?.id]);
+
+  const finishIntro = (play) => {
+    store_(() => sessionStorage.setItem('pg_intro_done', '1'));
+    setIntro(false);
+    if (play) setOpen(true);
+  };
+
   if (!games?.length) return null;
-  const current = game || games[0];
   const label = t(current.texts?.triggerLabel, locale) || ui.play;
 
   return (
     <div style={cssVars(current)}>
       <button className="trigger" onClick={() => setOpen(true)}>{label}</button>
+      {intro && !open && <Intro game={current} locale={locale} setLocale={setLocale} onPlay={() => finishIntro(true)} onDecline={() => finishIntro(false)} />}
       {open && (
         <div className="overlay" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
           <div className="modal">
+            <LangToggle locale={locale} setLocale={setLocale} />
             <button className="close" aria-label={ui.close} onClick={() => setOpen(false)}>×</button>
             {game ? <Play key={game.id} game={game} api={api} store={store} locale={locale} onClose={() => setOpen(false)} /> : (
               <div className="picker">
@@ -54,6 +121,30 @@ export default function Widget({ store, api, locale: rawLocale, gameType }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// "Play to Win" popup. Copy comes from the dashboard; blank fields fall back to the defaults.
+function Intro({ game, locale, setLocale, onPlay, onDecline }) {
+  const cfg = game.texts?.intro || {};
+  const d = INTRO_DEFAULTS[locale];
+  const pick = (k) => t(cfg[k], locale) || d[k];
+  const steps = (cfg.steps || []).map((x) => t(x, locale)).filter(Boolean);
+  const list = steps.length ? steps : d.steps;
+  return (
+    <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="pg-intro-title" onClick={(e) => e.target === e.currentTarget && onDecline()}>
+      <div className="modal intro">
+        <LangToggle locale={locale} setLocale={setLocale} />
+        <button className="close" aria-label={UI[locale].close} onClick={onDecline}>×</button>
+        {cfg.image && <img className="intro-img" src={cfg.image} alt="" />}
+        <h2 id="pg-intro-title">{pick('heading')}</h2>
+        <p className="intro-desc">{pick('description')}</p>
+        <ol className="steps">{list.map((x, i) => <li key={i}><span>{i + 1}</span>{x}</li>)}</ol>
+        <button className="btn" onClick={onPlay} autoFocus>{pick('playLabel')}</button>
+        <button className="btn ghost" onClick={onDecline}>{pick('declineLabel')}</button>
+        <p className="fine">{pick('note')}</p>
+      </div>
     </div>
   );
 }
@@ -81,8 +172,8 @@ function Play({ game, api, store, locale, onClose }) {
         body: JSON.stringify({ key: store, gameId: game.id, email: email.trim(), locale }),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok) setResult(data);
-      else if (data.error === 'already_played') setError(`${ui.already} ${ui.comeBack} ${new Date(data.nextPlayAt).toLocaleDateString(locale === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}.`);
+      if (res.ok) { setResult(data); try { localStorage.setItem(`pg_played_${game.id}`, data.expiresAt); } catch {} }
+      else if (data.error === 'already_played') { try { localStorage.setItem(`pg_played_${game.id}`, data.nextPlayAt); } catch {} setError(`${ui.already} ${ui.comeBack} ${new Date(data.nextPlayAt).toLocaleDateString(locale === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}.`); }
       else if (data.error === 'invalid_email') setError(ui.invalidEmail);
       else setError(ui.error);
     } catch { setError(ui.error); }
@@ -111,7 +202,9 @@ function Play({ game, api, store, locale, onClose }) {
 
   return (
     <div className="screen result">
-      <h2>{result.rewards.length > 1 ? ui.yourRewards : ui.yourReward}</h2>
+      <Confetti />
+      <h2 className="congrats">{ui.congrats}</h2>
+      <p className="muted won">{result.rewards.length > 1 ? ui.yourRewards : ui.yourReward}</p>
       {result.rewards.map((r) => <RewardCard key={r.id} r={r} locale={locale} />)}
       <p className="fine strong">{ui.oneUse} {result.expiresText}.</p>
       <p className="fine">{ui.emailed} {result.email}</p>
