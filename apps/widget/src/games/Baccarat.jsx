@@ -39,7 +39,7 @@ export default function Baccarat({ result, locale, onDone }) {
         <div className="bac-bets">
           {['player', 'tie', 'banker'].map((k) => (
             <button key={k} className={`bet-spot ${bet === k ? 'on' : ''}`} disabled={!!bet} onClick={() => place(k)}>
-              <b>{b[k]}</b><small>{b.pays[k]}</small>{bet === k && <span className="bet-chip" aria-hidden="true" />}
+              <b>{b[k]}</b>{bet === k && <span className="bet-chip" aria-hidden="true" />}
             </button>
           ))}
         </div>

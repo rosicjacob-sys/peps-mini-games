@@ -70,7 +70,7 @@ export const UI = {
     bjResult: { blackjack: 'Blackjack!', win: 'You win!', push: 'Push', loss: 'Dealer wins' }, bjNext: 'Spin for your reward',
     color: { roll: 'ROLL THE DICE', rolling: 'Rolling…', board: 'Match two or three dice to win that prize', match: 'Your colour!', noMatch: 'No match this time' },
     l9: { draw: 'Draw', stand: 'Stand', banker: 'Banker', you: 'You', natural: 'Natural 9!', win: 'You win!', bankerWins: 'Banker wins', closest: 'Closest to 9 wins' },
-    bac: { pick: 'Place your bet', player: 'Player', banker: 'Banker', tie: 'Tie', pays: { player: 'pays 1:1', banker: 'pays 0.95:1', tie: 'pays 8:1' }, wins: { player: 'Player wins!', banker: 'Banker wins!', tie: 'It’s a tie!' }, yourBet: 'Your bet wins!', betLoses: 'Your bet loses.' },
+    bac: { pick: 'Place your bet', player: 'Player', banker: 'Banker', tie: 'Tie', wins: { player: 'Player wins!', banker: 'Banker wins!', tie: 'It’s a tie!' }, yourBet: 'Your bet wins!', betLoses: 'Your bet loses.' },
     poker: { deal: 'DEAL', dealing: 'Dealing…', paytable: 'Paytable', hands: { high: 'No winning hand', pair: 'Pair', two_pair: 'Two Pair', three: 'Three of a Kind', straight: 'Straight', flush: 'Flush', full_house: 'Full House', four: 'Four of a Kind', straight_flush: 'Straight Flush' } },
   },
   fr: {
@@ -89,7 +89,7 @@ export const UI = {
     bjResult: { blackjack: 'Blackjack!', win: 'Vous gagnez!', push: 'Égalité', loss: 'Le croupier gagne' }, bjNext: 'Tourner pour ma récompense',
     color: { roll: 'LANCER LES DÉS', rolling: 'Lancer…', board: 'Deux ou trois dés de la même couleur gagnent ce prix', match: 'Votre couleur!', noMatch: 'Pas de correspondance' },
     l9: { draw: 'Tirer', stand: 'Rester', banker: 'Banquier', you: 'Vous', natural: '9 naturel!', win: 'Vous gagnez!', bankerWins: 'Le banquier gagne', closest: 'Le plus proche de 9 gagne' },
-    bac: { pick: 'Placez votre mise', player: 'Joueur', banker: 'Banquier', tie: 'Égalité', pays: { player: 'paie 1:1', banker: 'paie 0,95:1', tie: 'paie 8:1' }, wins: { player: 'Le joueur gagne!', banker: 'Le banquier gagne!', tie: 'Égalité!' }, yourBet: 'Votre mise gagne!', betLoses: 'Votre mise perd.' },
+    bac: { pick: 'Placez votre mise', player: 'Joueur', banker: 'Banquier', tie: 'Égalité', wins: { player: 'Le joueur gagne!', banker: 'Le banquier gagne!', tie: 'Égalité!' }, yourBet: 'Votre mise gagne!', betLoses: 'Votre mise perd.' },
     poker: { deal: 'DISTRIBUER', dealing: 'Distribution…', paytable: 'Table des gains', hands: { high: 'Aucune main gagnante', pair: 'Paire', two_pair: 'Deux paires', three: 'Brelan', straight: 'Quinte', flush: 'Couleur', full_house: 'Main pleine', four: 'Carré', straight_flush: 'Quinte flush' } },
   },
 };

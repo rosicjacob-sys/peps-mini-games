@@ -169,9 +169,8 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 22px; f
 .bac-side .bj-card { width: 48px; height: 68px; } .bac-side .bj-card .cs { font-size: 22px; }
 .bac-side.won { box-shadow: inset 0 0 0 2px var(--rim), 0 0 18px color-mix(in srgb, var(--rim) 45%, transparent); }
 .bac-bets { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; width: 100%; }
-.bet-spot { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 4px; border-radius: 12px; cursor: pointer; color: var(--text);
+.bet-spot { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 16px 4px; border-radius: 12px; cursor: pointer; color: var(--text);
   background: rgba(0,0,0,.28); border: 2px solid color-mix(in srgb, var(--rim) 70%, transparent); font-family: "Coffee Tin", "Rye", Impact, serif; text-transform: uppercase; letter-spacing: .04em; font-size: 15px; }
-.bet-spot small { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-transform: none; letter-spacing: 0; font-size: 11px; color: var(--muted); }
 .bet-spot:hover:not(:disabled) { background: rgba(0,0,0,.4); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rim) 30%, transparent); }
 .bet-spot.on { border-color: var(--rim); box-shadow: 0 0 16px color-mix(in srgb, var(--rim) 50%, transparent); }
 .bet-spot:disabled { cursor: default; } .bet-spot:disabled:not(.on) { opacity: .45; }
