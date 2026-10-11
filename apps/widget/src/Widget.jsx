@@ -223,7 +223,7 @@ function Play({ game, api, store, locale, onClose, onBack }) {
       else if (data.error === 'already_played') {
         markPlayed(store, data.nextPlayAt);
         const when = data.nextPlayText || new Date(data.nextPlayAt).toLocaleDateString(locale === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
-        setError(`${ui.already} ${data.email || email.trim()}. ${ui.onePer} ${ui.comeBack} ${when}.`);
+        setError(`${ui.already} ${data.email || email.trim()}. ${ui.onePer} ${ui.comeBack} ${when}${ui.orOther}.`);
       }
       else if (data.error === 'invalid_email') setError(ui.invalidEmail);
       else setError(ui.error);
