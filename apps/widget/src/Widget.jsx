@@ -199,7 +199,7 @@ function Play({ game, api, store, locale, onClose, onBack }) {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState(null);   // server response — the outcome is already decided
+  const [result, setResult] = useState(null);   // server response - the outcome is already decided
   const [done, setDone] = useState(false);       // game animation finished
   const heading = t(game.texts?.heading, locale) || game.name;
   const sub = t(game.texts?.subheading, locale);
@@ -273,7 +273,7 @@ function Play({ game, api, store, locale, onClose, onBack }) {
       <p className="muted won">{result.rewards.length > 1 ? ui.yourRewards : ui.yourReward}</p>
       {result.rewards.map((r) => <RewardCard key={r.id} r={r} locale={locale} />)}
       <p className="redeem">🛒 {ui.redeem}</p>
-      <p className="fine strong">{ui.oneUse} {result.expiresText}.</p>
+      <p className="fine strong">{ui.limited}</p>
       <p className="fine">{ui.emailed} {result.email}</p>
       <button className="btn ghost" onClick={onClose}>{ui.close}</button>
     </div>

@@ -59,7 +59,7 @@ function Rewards({ game, reload }) {
   }
   async function save() {
     setErr(''); setMsg('');
-    try { const saved = await api.saveRewards(game.id, rows, Number(lose) || 0); setRows(saved.map((r) => ({ ...r, probability: Number(r.probability) }))); setMsg('Saved — live on the store now.'); reload(); } catch (e) { setErr(e.message); }
+    try { const saved = await api.saveRewards(game.id, rows, Number(lose) || 0); setRows(saved.map((r) => ({ ...r, probability: Number(r.probability) }))); setMsg('Saved. Live on the store now.'); reload(); } catch (e) { setErr(e.message); }
   }
   return (
     <>
@@ -87,7 +87,7 @@ function Rewards({ game, reload }) {
       {picking && <LibraryPicker library={library} inGame={inGame} onAdd={addFromLibrary} onClose={() => setPicking(false)} />}
       <div className="card reward-row lose-row">
         <div className="row">
-          <div className="grow"><b>No reward — the player loses</b>
+          <div className="grow"><b>No reward: the player loses</b>
             <p className="muted small">The chance a play wins nothing. They see a loss in the game (dealer or banker wins, no match, no winning hand, or "Try again" on the wheel), then "Try again next week" with a note about weekly promotions. No email is sent. Set 0 so everyone wins.</p></div>
           <label>Probability %<input className="num-in" type="number" min="0" max="100" step="0.5" value={lose} onChange={(e) => setLose(e.target.value)} /></label>
         </div>
@@ -156,7 +156,7 @@ function Settings({ game, reload, section, back }) {
                 ))}
               </div>
               <div className="row">
-                <label>Brand accent colour <span className="muted">(optional — replaces the gold on buttons)</span>
+                <label>Brand accent colour <span className="muted">(optional, replaces the gold on buttons)</span>
                   <input type="color" value={g.brand_accent || th.accent} onChange={(e) => setG({ ...g, brand_accent: e.target.value })} /></label>
                 {g.brand_accent && <button className="link" onClick={() => setG({ ...g, brand_accent: null })}>Reset to neutral</button>}
               </div>
@@ -187,12 +187,12 @@ function Settings({ game, reload, section, back }) {
           </div>
           <p className="muted">
             {game.effective_sender?.source === 'game' && <>Sending as <b>{game.effective_sender.from_name} &lt;{game.effective_sender.from_email}&gt;</b> (set on this game).</>}
-            {game.effective_sender?.source === 'group' && <>Blank — sending as <b>{game.effective_sender.from_name} &lt;{game.effective_sender.from_email}&gt;</b>, the default of store group "{game.group_name}". Fill these in to override.</>}
-            {game.effective_sender?.source === 'none' && <b className="bad">No sender set — code emails will not be sent. Set one here or on the store group.</b>}
+            {game.effective_sender?.source === 'group' && <>Blank, so sending as <b>{game.effective_sender.from_name} &lt;{game.effective_sender.from_email}&gt;</b>, the default of store group "{game.group_name}". Fill these in to override.</>}
+            {game.effective_sender?.source === 'none' && <b className="bad">No sender set: code emails will not be sent. Set one here or on the store group.</b>}
             {' '}The from-address domain must be verified in your Resend account.
           </p>
           <Loc label="Email subject" value={g.email_subject} onChange={(v) => setG({ ...g, email_subject: v })} ph="Your reward code" />
-          <p className="muted">Every code email states the code is single-use and expires Sunday 11:59 PM ET; players can play once per week (resets Monday 12:00 AM ET).</p>
+          <p className="muted">Every code email tells players the offer is only available for a very limited time. Players can play once per week (resets Monday 12:00 AM ET).</p>
         </>
       )}
       <div className="row">
@@ -239,7 +239,7 @@ function IntroEditor({ g, setT }) {
         </div>
       ))}
       {intro.steps.length < 6 && <button onClick={() => set({ steps: [...intro.steps, L('', '')] })}>+ Add step</button>}
-      {!intro.steps.length && <p className="muted">No steps set — the 3 suggested steps are shown.</p>}
+      {!intro.steps.length && <p className="muted">No steps set, so the 3 suggested steps are shown.</p>}
       <Loc label="Small print" rows="2" value={intro.note} onChange={(v) => set({ note: v })} ph={ph('note', 'en')} />
       <div className="row"><Loc label="Play button" value={intro.playLabel} onChange={(v) => set({ playLabel: v })} ph={ph('playLabel', 'en')} /></div>
       <Loc label="Decline button" value={intro.declineLabel} onChange={(v) => set({ declineLabel: v })} ph={ph('declineLabel', 'en')} />

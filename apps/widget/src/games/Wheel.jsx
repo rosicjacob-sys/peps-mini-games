@@ -90,7 +90,7 @@ export default function Wheel({ game, result, locale, onDone }) {
     timer.current = setTimeout(() => {
       phase.current = 'spin';
       setTurn({ rot: next, tr: 'transform 5.6s cubic-bezier(.2,.62,.12,1)' });
-      // transitionend can be skipped (background tab, reduced motion) — never leave the player stuck.
+      // transitionend can be skipped (background tab, reduced motion) - never leave the player stuck.
       timer.current = setTimeout(ended, 6000);
     }, 300);
     ticks(pegs);
@@ -160,7 +160,7 @@ export default function Wheel({ game, result, locale, onDone }) {
         <circle cx={R} cy={R} r={R - 5} fill="none" stroke={rim} strokeWidth="9" />
         <circle cx={R} cy={R} r={R - 9.5} fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="1" />
         <circle cx={R} cy={R} r={R - 1.5} fill="none" stroke="rgba(255,255,255,.25)" strokeWidth="1" />
-        {/* marquee bulbs on the rim — they chase while the wheel spins */}
+        {/* marquee bulbs on the rim - they chase while the wheel spins */}
         {Array.from({ length: pegs }, (_, i) => { const [px, py] = polar((360 / pegs) * i, R - 5); return (
           <g key={i} className="bulb" style={{ animationDelay: `${(i % 3) * 0.2}s` }}>
             <circle cx={px} cy={py} r="3.6" fill="#fff7d6" stroke="rgba(0,0,0,.35)" strokeWidth=".8" />

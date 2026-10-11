@@ -138,7 +138,7 @@ adminRouter.put('/games/:id/rewards', wrap(async (req, res) => {
     id: r.id || null, title: loc(r.title), subtitle: loc(r.subtitle), code: String(r.code || '').trim().slice(0, 80),
     probability: Math.max(0, Math.min(100, Number(r.probability) || 0)), active: r.active !== false, sort: i,
   }));
-  if (clean.some((r) => !r.library_id)) return res.status(400).json({ error: 'Rewards come from the rewards library — add them with "+ Add from library".' });
+  if (clean.some((r) => !r.library_id)) return res.status(400).json({ error: 'Rewards come from the rewards library. Add them with "+ Add from library".' });
   const max = GAME_TYPES[g.type]?.maxRewards;
   if (max && clean.filter((r) => r.active).length > max) return res.status(400).json({ error: `${GAME_TYPES[g.type].label} has ${max} colours, so it can have at most ${max} active rewards.` });
   const lose = Math.max(0, Math.min(100, Number(req.body.lose_percent) || 0));

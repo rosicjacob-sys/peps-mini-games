@@ -5,7 +5,7 @@ import { sound } from '../sound.js';
 const ROW = 84;            // px per tile
 const STRIP = 26;          // symbols per reel strip
 const TARGET_AT = 22;      // where the winning symbol sits in each strip
-const STOP = [2200, 2900, 3600]; // ms each reel takes — staggered stops
+const STOP = [3000, 3600, 4200]; // ms each reel takes - staggered stops; every spin lasts at least 3 s
 const PULL = 200;                // reels start as the lever comes down
 const LOCK = 0.93;               // share of a reel's time spent spinning; the rest is the settle back onto the line
 
@@ -40,7 +40,6 @@ export default function Slots({ game, result, locale, onDone }) {
     STOP.forEach((ms, r) => sfx.current.push(setTimeout(() => { sound.play('reelStop'); if (r === 2) stopSfx(); }, PULL + ms * LOCK)));
     // each reel: a small kick back, a smooth run up to speed and a long slow-down that carries just past the
     // pay line, then settles back onto it
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const end = -(TARGET_AT - 1) * ROW;
     stripRefs.current.forEach((el, r) => {
       if (!el) return;
@@ -49,10 +48,10 @@ export default function Slots({ game, result, locale, onDone }) {
         { transform: 'translateY(14px)', offset: 0.05, easing: 'cubic-bezier(.45,.05,.2,1)' },
         { transform: `translateY(${end - 16}px)`, offset: LOCK, easing: 'cubic-bezier(.3,.6,.4,1)' },
         { transform: `translateY(${end}px)` },
-      ], { duration: reduce ? 600 : STOP[r], delay: reduce ? 0 : PULL, fill: 'forwards' });
+      ], { duration: STOP[r], delay: PULL, fill: 'forwards' });
       if (r === 2) a.onfinish = finish;
     });
-    // transitionend can be skipped (background tab, reduced motion) — never leave the player stuck.
+    // transitionend can be skipped (background tab, reduced motion) - never leave the player stuck.
     timer.current = setTimeout(finish, PULL + STOP[2] + 700);
   }
   function finish() {

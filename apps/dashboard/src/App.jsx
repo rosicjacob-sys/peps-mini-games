@@ -132,7 +132,7 @@ function Games({ open }) {
               </button>
               <div className="gc-foot">
                 <span><b>{fmtInt(g.play_count)}</b> <span className="muted small">plays all time</span></span>
-                <label className="switch" title={g.status === 'active' ? 'Live on the store — click to pause' : 'Paused — click to make live'}>
+                <label className="switch" title={g.status === 'active' ? 'Live on the store. Click to pause' : 'Paused. Click to make live'}>
                   <input type="checkbox" checked={g.status === 'active'} onChange={() => toggle(g)} />
                   <span className="track" /><span className="small">{g.status === 'active' ? 'Live' : 'Paused'}</span>
                 </label>
@@ -189,7 +189,7 @@ function StoreForm({ s, groups, onCancel, onSaved, onDelete }) {
           <span className="help">Code emails use the group's sender address. <a href="#/groups">Manage groups</a></span></label>
         <label className="span-2"><span>Store website <span className="optional">optional</span></span>
           <textarea rows="2" value={sites} onChange={(e) => setSites(e.target.value)} placeholder="https://lexarcanada.ca" />
-          <span className="help">Only these addresses can load the games — stops other sites copying your install code. Add one per line (include the www. version if your store uses it). Leave empty while testing.</span></label>
+          <span className="help">Only these addresses can load the games. This stops other sites copying your install code. Add one per line (include the www. version if your store uses it). Leave empty while testing.</span></label>
       </div>
       {err && <p className="error">{err}</p>}
       <div className="form-actions">
@@ -232,7 +232,7 @@ function StoreCard({ s, groups, reload }) {
             <li><b>Copy the install code</b>
               <div className="snippet"><code>{snippet}</code><button className="primary small" onClick={copy}>{copied ? 'Copied ✓' : 'Copy'}</button></div></li>
             <li><b>Open the theme code in Shopify</b><span className="muted">Online Store → Themes → ⋯ (next to your theme) → Edit code</span></li>
-            <li><b>Paste it into <code>layout/theme.liquid</code></b><span className="muted">just above the closing <code>&lt;/body&gt;</code> tag, then Save. Do this once — game changes made here go live automatically.</span></li>
+            <li><b>Paste it into <code>layout/theme.liquid</code></b><span className="muted">just above the closing <code>&lt;/body&gt;</code> tag, then Save. Do this once: game changes made here go live automatically.</span></li>
           </ol>
         </div>
       )}

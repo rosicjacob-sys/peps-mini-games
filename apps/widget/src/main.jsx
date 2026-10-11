@@ -4,7 +4,7 @@ import Widget from './Widget.jsx';
 import css from './styles.css?inline';
 
 // Display face: "Coffee Tin" when self-hosted next to widget.js (public/fonts/coffee-tin.woff2),
-// otherwise "Rye" from Google Fonts — the same Tuscan casino look. Fonts are document-scoped,
+// otherwise "Rye" from Google Fonts - the same Tuscan casino look. Fonts are document-scoped,
 // so both go in the host page's <head>.
 function loadFont(assetBase) {
   if (document.querySelector('link[data-peps-font]')) return;

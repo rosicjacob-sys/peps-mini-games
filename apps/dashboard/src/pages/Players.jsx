@@ -73,7 +73,7 @@ export function PlayerDrawer({ email, onClose }) {
           <>
             <div className="mini-kpis">
               <div><b>{fmtInt(real.length)}</b><span>plays</span></div>
-              <div><b>{real.length ? fmtDateShort(real[real.length - 1].created_at) : '—'}</b><span>first played</span></div>
+              <div><b>{real.length ? fmtDateShort(real[real.length - 1].created_at) : '-'}</b><span>first played</span></div>
               <div><b>{new Set(real.map((p) => p.store)).size}</b><span>stores</span></div>
             </div>
             {msg && <div className="alert info">{msg}</div>}

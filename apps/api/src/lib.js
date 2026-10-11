@@ -19,10 +19,6 @@ export function formatDate(iso, locale) {
   return DateTime.fromISO(iso).setZone(ZONE).setLocale(locale === 'fr' ? 'fr-CA' : 'en-CA')
     .toLocaleString({ weekday: 'long', month: 'long', day: 'numeric' });
 }
-export function formatExpiry(iso, locale) {
-  const d = formatDate(iso, locale);
-  return locale === 'fr' ? `${d} à 23 h 59 (HE)` : `${d} at 11:59 PM ET`;
-}
 
 export function normalizeEmail(email) {
   const e = String(email || '').trim().toLowerCase();

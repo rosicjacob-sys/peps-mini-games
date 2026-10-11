@@ -18,8 +18,8 @@ function insights(o) {
   if (k.plays) { const b = dows.indexOf(Math.max(...dows)); out.push({ tone: 'info', text: `${DOW_LONG[b]} bring the most plays (${pct(dows[b] / k.plays)} of the week).` }); }
   const g = o.by.group[0]; if (g && o.by.group.length > 1) out.push({ tone: 'info', text: `${g.key} drives ${pct(g.plays / k.plays)} of plays.` });
   const odd = oddsChecks(o.rewards)[0];
-  if (odd) out.push({ tone: 'warn', text: `${tr(odd.title)} (${odd.game} · ${odd.store}) is landing ${pct(odd.actual, 1)} vs ${pct(odd.set, 1)} set — check the odds.` });
-  if (k.failed) out.push({ tone: 'bad', text: `${fmtInt(k.failed)} code email${k.failed === 1 ? '' : 's'} failed to send — see Email delivery.`, link: 'delivery' });
+  if (odd) out.push({ tone: 'warn', text: `${tr(odd.title)} (${odd.game} · ${odd.store}) is landing ${pct(odd.actual, 1)} vs ${pct(odd.set, 1)} set. Check the odds.` });
+  if (k.failed) out.push({ tone: 'bad', text: `${fmtInt(k.failed)} code email${k.failed === 1 ? '' : 's'} failed to send. See Email delivery.`, link: 'delivery' });
   const lostN = o.rewards.filter((r) => r.lost).reduce((a, r) => a + r.won, 0);
   if (lostN && k.plays) out.push({ tone: 'info', text: `${pct(lostN / k.plays)} of plays won nothing (${fmtInt(lostN)}).` });
   if (k.fr) out.push({ tone: 'info', text: `French: ${pct(k.fr / k.plays)} of plays.` });
@@ -143,7 +143,7 @@ function Rewards({ o, go }) {
       table={{ columns: [
         { key: 'title', label: 'Reward', render: (r) => tr(r.title) }, { key: 'code', label: 'Code', render: (r) => <code>{r.code}</code> },
         { key: 'game', label: 'Game', render: (r) => `${r.game} · ${r.store}` }, { key: 'won', label: 'Won', num: true },
-        { key: 'actual', label: 'Actual', num: true, render: (r) => pct(r.actual, 1) }, { key: 'probability', label: 'Set', num: true, render: (r) => (r.probability == null ? '—' : `${r.probability}%`) },
+        { key: 'actual', label: 'Actual', num: true, render: (r) => pct(r.actual, 1) }, { key: 'probability', label: 'Set', num: true, render: (r) => (r.probability == null ? '-' : `${r.probability}%`) },
       ], rows: tableRows }}>
       {!o.rewards.length && <p className="muted empty">No rewards won in this range.</p>}
       <div className="reward-games">

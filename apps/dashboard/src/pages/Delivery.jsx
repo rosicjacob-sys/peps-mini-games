@@ -23,7 +23,7 @@ export default function Delivery() {
       try { const r = await api.resend(id); r.ok ? res.ok++ : (res.fail++, (res.last = r.error)); } catch (e) { res.fail++; res.last = e.message; }
       setBusy((b) => ({ ...b, [id]: false }));
     }
-    setNote(`${res.ok} sent${res.fail ? `, ${res.fail} still failing — ${res.last}` : ''}.`); load();
+    setNote(`${res.ok} sent${res.fail ? `, ${res.fail} still failing (${res.last})` : ''}.`); load();
   };
   const c = d?.counts || { sent: 0, failed: 0, pending: 0 };
   const pages = d ? Math.ceil(d.total / d.pageSize) : 0;
@@ -57,7 +57,7 @@ export default function Delivery() {
                 <td>{(r.rewards || []).map((x) => tr(x.title)).join(', ')} {(r.rewards || []).map((x) => <code key={x.code}>{x.code}</code>)}</td>
                 <td className="muted">{r.game} · {r.store}</td>
                 <td><span className={`pill ${r.email_status}`}>{{ sent: '✓ sent', failed: '✕ failed', pending: '… pending' }[r.email_status]}</span></td>
-                <td className="reason">{r.email_error || <span className="muted">—</span>}</td>
+                <td className="reason">{r.email_error || <span className="muted">-</span>}</td>
                 <td className="num">{r.email_attempts}</td>
                 <td>{r.email_status !== 'sent' && <button className="ghost small" disabled={busy[r.id]} onClick={() => resend([r.id])}>{busy[r.id] ? 'Sending…' : 'Resend'}</button>}</td>
               </tr>
