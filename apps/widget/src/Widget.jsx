@@ -203,7 +203,8 @@ function Play({ game, api, store, locale, onClose }) {
   if (!done) {
     const Stage = stages[stage];
     const next = () => (stage + 1 < stages.length ? setStage(stage + 1) : setDone(true));
-    return <div className="screen"><h2>{heading}</h2><Stage key={stage} game={game} result={result} locale={locale} onDone={next} /></div>;
+    // a wheel that follows another stage gets its own heading
+    return <div className="screen"><h2>{stage > 0 ? ui.spinHeading : heading}</h2><Stage key={stage} game={game} result={result} locale={locale} onDone={next} /></div>;
   }
 
   return (
