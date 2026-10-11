@@ -2,7 +2,6 @@ import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 import { GAME_TYPES, THEMES, SLOT_SYMBOLS } from '@peps/shared';
-import { OUTCOMES } from '@peps/shared/blackjack.js';
 import { q, pool } from './db.js';
 
 export const adminRouter = Router();
@@ -103,7 +102,7 @@ adminRouter.put('/games/:id/rewards', wrap(async (req, res) => {
   if (!g) return res.sendStatus(404);
   const clean = list.map((r, i) => ({
     symbol: g.type === 'slots' && SLOT_SYMBOLS.includes(r.symbol) ? r.symbol : null,
-    outcome: g.type === 'blackjack' ? (OUTCOMES.includes(r.outcome) ? r.outcome : 'win') : null,
+    outcome: null, // legacy column: blackjack no longer maps a reward to a hand result
     id: r.id || null, title: loc(r.title), subtitle: loc(r.subtitle), code: String(r.code || '').trim().slice(0, 80),
     probability: Math.max(0, Math.min(100, Number(r.probability) || 0)), active: r.active !== false, sort: i,
   }));

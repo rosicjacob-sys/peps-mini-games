@@ -61,7 +61,8 @@ export default function Wheel({ game, result, locale, onDone }) {
           const [tx, ty] = polar(mid, R * 0.62);
           return (
             <g key={r.id}>
-              <path d={`M${R},${R} L${x0},${y0} A${R - 4},${R - 4} 0 ${step > 180 ? 1 : 0} 1 ${x1},${y1} Z`} fill={fill} stroke={th.border} strokeWidth="1.5" />
+              {n === 1 ? <circle cx={R} cy={R} r={R - 4} fill={fill} stroke={th.border} strokeWidth="1.5" />
+                : <path d={`M${R},${R} L${x0},${y0} A${R - 4},${R - 4} 0 ${step > 180 ? 1 : 0} 1 ${x1},${y1} Z`} fill={fill} stroke={th.border} strokeWidth="1.5" />}
               <text x={tx} y={ty} fill={th.text} fontSize={n > 6 ? 11 : 13} fontWeight="700" textAnchor="middle" dominantBaseline="middle"
                 transform={`rotate(${mid - 90 + (mid > 180 ? 180 : 0)} ${tx} ${ty})`}>
                 {clip(t(r.title, locale), n > 6 ? 14 : 18)}

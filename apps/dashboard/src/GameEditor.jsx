@@ -3,8 +3,7 @@ import { api } from './api.js';
 import { GAME_TYPES, THEMES, SLOT_SYMBOLS, INTRO_DEFAULTS, themeFor, t } from '@peps/shared';
 
 const TABS = ['Rewards', 'Players', 'Intro popup', 'Appearance', 'Texts & Email'];
-const blankReward = (type) => ({ title: { en: '', fr: '' }, subtitle: { en: '', fr: '' }, code: '', probability: 0, active: true, ...(type === 'blackjack' ? { outcome: 'win' } : {}) });
-const HAND_RESULTS = { blackjack: 'Blackjack (21)', win: 'Player wins', push: 'Push (tie)', loss: 'Dealer wins' };
+const blankReward = () => ({ title: { en: '', fr: '' }, subtitle: { en: '', fr: '' }, code: '', probability: 0, active: true });
 
 export default function GameEditor({ id, back }) {
   const [game, setGame] = useState(null); const [tab, setTab] = useState('Rewards');
@@ -53,7 +52,7 @@ function Rewards({ game, reload }) {
   }
   return (
     <>
-      <p className="muted">Each play, the server picks {game.type === 'blackjack' || game.type === 'slots' ? 1 : game.rewards_per_play} reward{game.type === 'wheel' && game.rewards_per_play > 1 ? 's' : ''} using these probabilities.{game.type === 'slots' && ' All three reels stop on the winning reward\'s symbol.'}{game.type === 'blackjack' && ' The hand is dealt to end with the reward\'s "Hand result", whether the player hits or stands.'} Active rewards must add up to 100%. Codes must already exist in your discount app.</p>
+      <p className="muted">Each play, the server picks {game.type === 'blackjack' || game.type === 'slots' ? 1 : game.rewards_per_play} reward{game.type === 'wheel' && game.rewards_per_play > 1 ? 's' : ''} using these probabilities.{game.type === 'slots' && ' All three reels stop on the winning reward\'s symbol.'}{game.type === 'blackjack' && ' The player wins a warm-up hand, then spins a wheel; these probabilities decide where the wheel lands.'} Active rewards must add up to 100%. Codes must already exist in your discount app.</p>
       {rows.map((r, i) => (
         <div key={r.id || i} className={`card reward-row ${r.active ? '' : 'off'}`}>
           <Loc label="Title" value={r.title} onChange={(v) => set(i, { title: v })} ph="Free Reta" />
@@ -61,10 +60,6 @@ function Rewards({ game, reload }) {
           <div className="row">
             <label>Code<input value={r.code} onChange={(e) => set(i, { code: e.target.value })} placeholder="FREERETA" /></label>
             <label>Probability %<input className="num-in" type="number" min="0" max="100" step="0.5" value={r.probability} onChange={(e) => set(i, { probability: e.target.value })} /></label>
-            {game.type === 'blackjack' && (
-              <label>Hand result<select value={r.outcome || 'win'} onChange={(e) => set(i, { outcome: e.target.value })}>
-                {Object.entries(HAND_RESULTS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-            )}
             {game.type === 'slots' && (
               <label>Reel symbol<select value={r.symbol || ''} onChange={(e) => set(i, { symbol: e.target.value || null })}>
                 <option value="">Auto</option>{SLOT_SYMBOLS.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
@@ -75,7 +70,7 @@ function Rewards({ game, reload }) {
         </div>
       ))}
       <div className="row sticky">
-        <button onClick={() => setRows([...rows, blankReward(game.type)])}>+ Add reward</button>
+        <button onClick={() => setRows([...rows, blankReward()])}>+ Add reward</button>
         <button onClick={equalise}>Split evenly</button>
         <strong className={ok ? 'good' : 'bad'}>Total: {total.toFixed(2)}%</strong>
         <button className="primary" disabled={!ok && rows.some((r) => r.active)} onClick={save}>Save rewards</button>
