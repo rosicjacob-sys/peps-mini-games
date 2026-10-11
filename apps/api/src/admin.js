@@ -122,7 +122,11 @@ adminRouter.put('/games/:id/rewards', wrap(async (req, res) => {
   const list = Array.isArray(req.body.rewards) ? req.body.rewards : [];
   const { rows: [g] } = await q('SELECT type FROM games WHERE id = $1', [req.params.id]);
   if (!g) return res.sendStatus(404);
-  const clean = list.map((r, i) => ({
+  const libIds = list.map((r) => r.library_id).filter((x) => /^[0-9a-f-]{36}$/i.test(x || ''));
+  const { rows: libRows } = libIds.length ? await q('SELECT * FROM reward_library WHERE id = ANY($1::uuid[])', [libIds]) : { rows: [] };
+  const lib = new Map(libRows.map((x) => [x.id, x]));
+  const clean = list.map((r, i) => (lib.has(r.library_id) ? { ...r, ...pickLib(lib.get(r.library_id), r) } : r)).map((r, i) => ({
+    library_id: lib.has(r.library_id) ? r.library_id : null,
     symbol: g.type === 'slots' && SLOT_SYMBOLS.includes(r.symbol) ? r.symbol : null,
     outcome: null, // legacy column: blackjack no longer maps a reward to a hand result
     id: r.id || null, title: loc(r.title), subtitle: loc(r.subtitle), code: String(r.code || '').trim().slice(0, 80),
@@ -142,13 +146,63 @@ adminRouter.put('/games/:id/rewards', wrap(async (req, res) => {
     const keep = clean.filter((r) => r.id).map((r) => r.id);
     await client.query('DELETE FROM rewards WHERE game_id = $1 AND NOT (id = ANY($2::uuid[]))', [req.params.id, keep]);
     for (const r of clean) {
-      if (r.id) await client.query('UPDATE rewards SET title=$3,subtitle=$4,code=$5,probability=$6,active=$7,sort=$8,outcome=$9,symbol=$10 WHERE id=$1 AND game_id=$2', [r.id, req.params.id, r.title, r.subtitle, r.code, r.probability, r.active, r.sort, r.outcome, r.symbol]);
-      else await client.query('INSERT INTO rewards (game_id,title,subtitle,code,probability,active,sort,outcome,symbol) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [req.params.id, r.title, r.subtitle, r.code, r.probability, r.active, r.sort, r.outcome, r.symbol]);
+      if (r.id) await client.query('UPDATE rewards SET title=$3,subtitle=$4,code=$5,probability=$6,active=$7,sort=$8,outcome=$9,symbol=$10,library_id=$11 WHERE id=$1 AND game_id=$2', [r.id, req.params.id, r.title, r.subtitle, r.code, r.probability, r.active, r.sort, r.outcome, r.symbol, r.library_id]);
+      else await client.query('INSERT INTO rewards (game_id,title,subtitle,code,probability,active,sort,outcome,symbol,library_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [req.params.id, r.title, r.subtitle, r.code, r.probability, r.active, r.sort, r.outcome, r.symbol, r.library_id]);
     }
     await client.query('COMMIT');
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
   const { rows } = await q('SELECT * FROM rewards WHERE game_id = $1 ORDER BY sort, id', [req.params.id]);
   res.json(rows);
+}));
+
+// ---- rewards library
+const pickLib = (l, r = {}) => ({ title: l.title, subtitle: l.subtitle, code: l.code, symbol: l.symbol || r.symbol || null });
+const libFields = (b) => {
+  const f = { title: loc(b.title), subtitle: loc(b.subtitle), code: String(b.code || '').trim().slice(0, 80), symbol: SLOT_SYMBOLS.includes(b.symbol) ? b.symbol : null };
+  if (!f.title.en || !f.code) throw Object.assign(new Error('A library reward needs an English title and a code.'), { status: 400 });
+  return f;
+};
+adminRouter.get('/library', wrap(async (_req, res) => {
+  const { rows } = await q(`SELECT l.*, count(r.id)::int AS used_in,
+      coalesce(json_agg(json_build_object('game_id', g.id, 'game', g.name, 'store', s.name)) FILTER (WHERE r.id IS NOT NULL), '[]') AS games
+    FROM reward_library l LEFT JOIN rewards r ON r.library_id = l.id LEFT JOIN games g ON g.id = r.game_id LEFT JOIN stores s ON s.id = g.store_id
+    GROUP BY l.id ORDER BY l.title->>'en'`);
+  res.json(rows);
+}));
+adminRouter.post('/library', wrap(async (req, res) => {
+  const f = libFields(req.body);
+  const { rows } = await q('INSERT INTO reward_library (title, subtitle, code, symbol) VALUES ($1,$2,$3,$4) RETURNING *', [f.title, f.subtitle, f.code, f.symbol]);
+  res.status(201).json(rows[0]);
+}));
+// editing a library reward updates every game that uses it
+adminRouter.put('/library/:id', wrap(async (req, res) => {
+  const f = libFields(req.body);
+  const { rows } = await q('UPDATE reward_library SET title=$2, subtitle=$3, code=$4, symbol=$5 WHERE id=$1 RETURNING *', [req.params.id, f.title, f.subtitle, f.code, f.symbol]);
+  if (!rows[0]) return res.sendStatus(404);
+  const { rowCount } = await q(`UPDATE rewards r SET title=$2, subtitle=$3, code=$4,
+      symbol = CASE WHEN g.type = 'slots' AND $5::text IS NOT NULL THEN $5 ELSE r.symbol END
+    FROM games g WHERE g.id = r.game_id AND r.library_id = $1`, [req.params.id, f.title, f.subtitle, f.code, f.symbol]);
+  res.json({ ...rows[0], games_updated: rowCount });
+}));
+adminRouter.delete('/library/:id', wrap(async (req, res) => {
+  const { rows: [u] } = await q('SELECT count(*)::int AS n FROM rewards WHERE library_id = $1', [req.params.id]);
+  if (u.n) return res.status(409).json({ error: `Used by ${u.n} game${u.n === 1 ? '' : 's'} — remove it from those games first.` });
+  await q('DELETE FROM reward_library WHERE id = $1', [req.params.id]); res.sendStatus(204);
+}));
+// turn rewards already typed into games into library entries (same code + English title = one entry) and link them
+adminRouter.post('/library/import', wrap(async (_req, res) => {
+  const client = await pool.connect(); let created = 0, linked = 0;
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(`SELECT DISTINCT ON (code, title->>'en') code, title, subtitle, symbol FROM rewards WHERE library_id IS NULL ORDER BY code, title->>'en', sort`);
+    for (const r of rows) {
+      let { rows: [l] } = await client.query(`SELECT id FROM reward_library WHERE code = $1 AND title->>'en' = $2`, [r.code, r.title.en]);
+      if (!l) { ({ rows: [l] } = await client.query('INSERT INTO reward_library (title, subtitle, code, symbol) VALUES ($1,$2,$3,$4) RETURNING id', [r.title, r.subtitle, r.code, r.symbol])); created++; }
+      const u = await client.query(`UPDATE rewards SET library_id = $1 WHERE library_id IS NULL AND code = $2 AND title->>'en' = $3`, [l.id, r.code, r.title.en]); linked += u.rowCount;
+    }
+    await client.query('COMMIT');
+  } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+  res.json({ created, linked });
 }));
 
 // ---- stats: players, rewards tally

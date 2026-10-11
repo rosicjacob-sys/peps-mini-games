@@ -5,6 +5,7 @@ import GameEditor from './GameEditor.jsx';
 import Overview, { PageHead } from './pages/Overview.jsx';
 import Players from './pages/Players.jsx';
 import Delivery from './pages/Delivery.jsx';
+import Library from './pages/Library.jsx';
 import { FiltersProvider, useFilters } from './filters.jsx';
 import { fmtInt } from './format.js';
 
@@ -16,6 +17,7 @@ const NAV = [
   { key: 'delivery', label: 'Email delivery', icon: 'M2.5 5h15v10h-15zM2.5 5.5 10 11l7.5-5.5' },
   { section: 'Setup' },
   { key: 'games', label: 'Games', icon: 'M10 2.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15zM10 6v8M6 10h8' },
+  { key: 'rewards', label: 'Rewards library', icon: 'M3 8h14v9H3zM2 5h16v3H2zM10 5v12M10 5c-1.5-3-5-3-5-1s3 1 5 1c2 0 5 1 5-1s-3.5-2-5 1' },
   { key: 'stores', label: 'Stores', icon: 'M3 8l1.5-4.5h11L17 8M3 8v9h14V8M3 8h14M8 17v-5h4v5' },
   { key: 'groups', label: 'Store groups', icon: 'M3 5h6v5H3zM11 5h6v5h-6zM7 12h6v5H7z' },
 ];
@@ -67,6 +69,7 @@ export default function App() {
           {route.name === 'games' && route.id && <GameEditor id={route.id} back={() => (location.hash = '#/games')} />}
           {route.name === 'stores' && <Stores />}
           {route.name === 'groups' && <Groups />}
+          {route.name === 'rewards' && <Library />}
         </main>
       </div>
     </FiltersProvider>
