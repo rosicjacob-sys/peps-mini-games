@@ -1,0 +1,71 @@
+# Render Blueprint — peps-mini-games
+# Dashboard > New > Blueprint > pick this repo. Render creates 4 resources:
+#   peps-games-db         Postgres
+#   peps-games-api        Node web service (Starter)
+#   peps-games-dashboard  static site (admin UI)
+#   peps-games-widget     static site (widget.js loaded by the Shopify theme)
+databases:
+  - name: peps-games-db
+    plan: basic-256mb
+    databaseName: peps_games
+    user: peps_games
+
+services:
+  - type: web
+    name: peps-games-api
+    runtime: node
+    plan: starter
+    rootDir: .
+    buildCommand: npm ci --workspace @peps/api --include-workspace-root
+    startCommand: npm run start -w @peps/api
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: DATABASE_URL
+        fromDatabase:
+          name: peps-games-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DASHBOARD_PASSWORD   # shared admin password — set it in the Render dashboard
+        sync: false
+      - key: RESEND_API_KEY       # Resend account API key
+        sync: false
+      - key: DASHBOARD_ORIGIN     # e.g. https://peps-games-dashboard.onrender.com
+        sync: false
+
+  - type: web
+    name: peps-games-dashboard
+    runtime: static
+    rootDir: .
+    buildCommand: npm ci && npm run build:dashboard
+    staticPublishPath: apps/dashboard/dist
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: VITE_API_URL         # e.g. https://peps-games-api.onrender.com
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  - type: web
+    name: peps-games-widget
+    runtime: static
+    rootDir: .
+    buildCommand: npm ci && npm run build:widget
+    staticPublishPath: apps/widget/dist
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: VITE_API_URL
+        sync: false
+    headers:
+      - path: /widget.js
+        name: Cache-Control
+        value: public, max-age=300
+      - path: /*
+        name: Access-Control-Allow-Origin
+        value: "*"

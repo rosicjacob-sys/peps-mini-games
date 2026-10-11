@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Widget dev</title></head>
+<body style="font-family:sans-serif;padding:2rem"><h1>Widget preview</h1><p>Set VITE_API_URL and a store key below.</p>
+<script type="module">
+  import { mount } from '/src/main.jsx';
+  const p = new URLSearchParams(location.search);
+  mount({ store: p.get('store'), api: p.get('api') || 'http://localhost:3000', locale: p.get('locale') || 'en' });
+</script></body></html>

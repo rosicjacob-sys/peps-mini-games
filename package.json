@@ -1,0 +1,13 @@
+{
+  "name": "peps-mini-games",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:api": "npm run dev -w @peps/api",
+    "dev:dashboard": "npm run dev -w @peps/dashboard",
+    "dev:widget": "npm run dev -w @peps/widget",
+    "build:dashboard": "npm run build -w @peps/dashboard",
+    "build:widget": "npm run build -w @peps/widget"
+  }
+}
