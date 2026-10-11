@@ -35,8 +35,8 @@ export function Card({ c, hidden, delay = 0, hi }) {
     </div>
   );
 }
-// The dealer's shoe; cards are dealt from it.
-export const Deck = ({ className = '' }) => <div className={`bj-shoe deck ${className}`} aria-hidden="true"><i /><i /><i /></div>;
+// A deck of cards on the table; every card is dealt from it. Card-sized, with visible thickness.
+export const Deck = ({ className = '' }) => <div className={`deck ${className}`} aria-hidden="true"><i className="deck-body" /><i className="deck-top" /></div>;
 export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 // Standard deal order for two hands: first card each, then second card each (≈350 ms apart).
 export const DEAL = [0, 350, 700, 1050];
