@@ -6,12 +6,12 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const COPY = {
   en: {
     subject: 'Your reward code', hello: 'Thanks for playing!', yourCode: 'Your code',
-    how: 'Enter this code at checkout to receive your reward.',
+    how: 'Enter this code in your cart at checkout to apply your reward.',
     once: 'Single use only. Expires', fine: 'Valid once per customer.',
   },
   fr: {
     subject: 'Votre code de récompense', hello: 'Merci d’avoir joué!', yourCode: 'Votre code',
-    how: 'Entrez ce code à la caisse pour recevoir votre récompense.',
+    how: 'Entrez ce code dans votre panier, à la caisse, pour appliquer votre récompense.',
     once: 'Usage unique. Expire le', fine: 'Valide une seule fois par client.',
   },
 };

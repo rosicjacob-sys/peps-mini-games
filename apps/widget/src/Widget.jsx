@@ -212,6 +212,7 @@ function Play({ game, api, store, locale, onClose }) {
       <h2 className="congrats">{ui.congrats}</h2>
       <p className="muted won">{result.rewards.length > 1 ? ui.yourRewards : ui.yourReward}</p>
       {result.rewards.map((r) => <RewardCard key={r.id} r={r} locale={locale} />)}
+      <p className="redeem">🛒 {ui.redeem}</p>
       <p className="fine strong">{ui.oneUse} {result.expiresText}.</p>
       <p className="fine">{ui.emailed} {result.email}</p>
       <button className="btn ghost" onClick={onClose}>{ui.close}</button>
