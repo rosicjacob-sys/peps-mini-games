@@ -34,14 +34,25 @@ export function buildEmail({ game, rewards, locale, expiresAt }) {
   return { subject, html, text };
 }
 
+// A game's own sender wins; blank fields fall back to its store group's defaults.
+export function resolveSender(g) {
+  return {
+    from_name: g.from_name || g.group_from_name || '',
+    from_email: g.from_email || g.group_from_email || '',
+    reply_to: g.reply_to || g.group_reply_to || '',
+    source: g.from_email ? 'game' : g.group_from_email ? 'group' : 'none',
+  };
+}
+
 export async function sendEmail({ game, to, mail }) {
   if (!process.env.RESEND_API_KEY) { console.warn('[email] RESEND_API_KEY missing — skipped'); return false; }
-  if (!game.from_email) { console.warn(`[email] game ${game.id} has no from_email — skipped`); return false; }
-  const from = game.from_name ? `${game.from_name} <${game.from_email}>` : game.from_email;
+  const sender = resolveSender(game);
+  if (!sender.from_email) { console.warn(`[email] game ${game.id} has no from_email (and no group default) — skipped`); return false; }
+  const from = sender.from_name ? `${sender.from_name} <${sender.from_email}>` : sender.from_email;
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to: [to], subject: mail.subject, html: mail.html, text: mail.text, ...(game.reply_to ? { reply_to: game.reply_to } : {}) }),
+    body: JSON.stringify({ from, to: [to], subject: mail.subject, html: mail.html, text: mail.text, ...(sender.reply_to ? { reply_to: sender.reply_to } : {}) }),
   });
   if (!res.ok) { console.error('[email] Resend error', res.status, await res.text()); return false; }
   return true;

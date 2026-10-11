@@ -19,6 +19,8 @@ adminRouter.use((req, res, next) => {
   catch { res.status(401).json({ error: 'unauthorized' }); }
 });
 
+import { resolveSender } from './email.js';
+
 const wrap = (fn) => (req, res, next) => fn(req, res, next).catch(next);
 const loc = (v, max = 300) => ({ en: String(v?.en ?? '').slice(0, max), fr: String(v?.fr ?? '').slice(0, max) });
 
@@ -32,19 +34,36 @@ function cleanIntro(i = {}) {
   };
 }
 
+// ---- store groups
+const groupFields = (b) => [String(b.name || '').trim().slice(0, 80) || 'Untitled group', String(b.from_name || '').slice(0, 120), String(b.from_email || '').trim().slice(0, 254), String(b.reply_to || '').trim().slice(0, 254)];
+adminRouter.get('/groups', wrap(async (_req, res) => {
+  const { rows } = await q(`SELECT g.*, (SELECT count(*)::int FROM stores s WHERE s.group_id = g.id) AS store_count FROM store_groups g ORDER BY g.sort, g.created_at`);
+  res.json(rows);
+}));
+adminRouter.post('/groups', wrap(async (req, res) => {
+  const { rows } = await q('INSERT INTO store_groups (name, from_name, from_email, reply_to) VALUES ($1,$2,$3,$4) RETURNING *', groupFields(req.body));
+  res.status(201).json(rows[0]);
+}));
+adminRouter.put('/groups/:id', wrap(async (req, res) => {
+  const { rows } = await q('UPDATE store_groups SET name=$2, from_name=$3, from_email=$4, reply_to=$5 WHERE id=$1 RETURNING *', [req.params.id, ...groupFields(req.body)]);
+  rows[0] ? res.json(rows[0]) : res.sendStatus(404);
+}));
+// Deleting a group keeps its stores (they become ungrouped).
+adminRouter.delete('/groups/:id', wrap(async (req, res) => { await q('DELETE FROM store_groups WHERE id = $1', [req.params.id]); res.sendStatus(204); }));
+
 // ---- stores
 adminRouter.get('/stores', wrap(async (_req, res) => {
-  const { rows } = await q(`SELECT s.*, (SELECT count(*)::int FROM games g WHERE g.store_id = s.id) AS game_count FROM stores s ORDER BY s.created_at`);
+  const { rows } = await q(`SELECT s.*, sg.name AS group_name, (SELECT count(*)::int FROM games g WHERE g.store_id = s.id) AS game_count FROM stores s LEFT JOIN store_groups sg ON sg.id = s.group_id ORDER BY sg.sort, sg.name NULLS LAST, s.created_at`);
   res.json(rows);
 }));
 adminRouter.post('/stores', wrap(async (req, res) => {
   const origins = (req.body.allowed_origins || []).map((o) => String(o).trim().replace(/\/$/, '')).filter(Boolean);
-  const { rows } = await q('INSERT INTO stores (name, allowed_origins) VALUES ($1,$2) RETURNING *', [String(req.body.name || '').trim() || 'Untitled store', origins]);
+  const { rows } = await q('INSERT INTO stores (name, allowed_origins, group_id) VALUES ($1,$2,$3) RETURNING *', [String(req.body.name || '').trim() || 'Untitled store', origins, req.body.group_id || null]);
   res.status(201).json(rows[0]);
 }));
 adminRouter.put('/stores/:id', wrap(async (req, res) => {
   const origins = (req.body.allowed_origins || []).map((o) => String(o).trim().replace(/\/$/, '')).filter(Boolean);
-  const { rows } = await q('UPDATE stores SET name = $2, allowed_origins = $3 WHERE id = $1 RETURNING *', [req.params.id, String(req.body.name || '').trim(), origins]);
+  const { rows } = await q('UPDATE stores SET name = $2, allowed_origins = $3, group_id = $4 WHERE id = $1 RETURNING *', [req.params.id, String(req.body.name || '').trim(), origins, req.body.group_id || null]);
   rows[0] ? res.json(rows[0]) : res.sendStatus(404);
 }));
 adminRouter.delete('/stores/:id', wrap(async (req, res) => { await q('DELETE FROM stores WHERE id = $1', [req.params.id]); res.sendStatus(204); }));
@@ -52,17 +71,19 @@ adminRouter.delete('/stores/:id', wrap(async (req, res) => { await q('DELETE FRO
 // ---- games
 adminRouter.get('/games', wrap(async (req, res) => {
   const { rows } = await q(`
-    SELECT g.*, s.name AS store_name, s.public_key,
+    SELECT g.*, s.name AS store_name, s.public_key, sg.id AS group_id, sg.name AS group_name,
       (SELECT count(*)::int FROM plays p WHERE p.game_id = g.id AND NOT p.is_test) AS play_count
-    FROM games g JOIN stores s ON s.id = g.store_id
-    WHERE ($1::uuid IS NULL OR g.store_id = $1) ORDER BY s.name, g.created_at`, [req.query.store_id || null]);
+    FROM games g JOIN stores s ON s.id = g.store_id LEFT JOIN store_groups sg ON sg.id = s.group_id
+    WHERE ($1::uuid IS NULL OR g.store_id = $1) ORDER BY sg.sort, sg.name NULLS LAST, s.name, g.created_at`, [req.query.store_id || null]);
   res.json(rows);
 }));
 adminRouter.get('/games/:id', wrap(async (req, res) => {
-  const { rows: [g] } = await q('SELECT g.*, s.public_key, s.name AS store_name FROM games g JOIN stores s ON s.id = g.store_id WHERE g.id = $1', [req.params.id]);
+  const { rows: [g] } = await q(`SELECT g.*, s.public_key, s.name AS store_name, sg.name AS group_name,
+      sg.from_name AS group_from_name, sg.from_email AS group_from_email, sg.reply_to AS group_reply_to
+    FROM games g JOIN stores s ON s.id = g.store_id LEFT JOIN store_groups sg ON sg.id = s.group_id WHERE g.id = $1`, [req.params.id]);
   if (!g) return res.sendStatus(404);
   const { rows: rewards } = await q('SELECT * FROM rewards WHERE game_id = $1 ORDER BY sort, id', [g.id]);
-  res.json({ ...g, rewards });
+  res.json({ ...g, rewards, effective_sender: resolveSender(g) });
 }));
 
 function gameFields(b) {
@@ -159,12 +180,13 @@ const csvCell = (v) => { const s = String(v ?? ''); return /^[=+\-@\t\r]/.test(s
 adminRouter.get('/games/:id/export.csv', wrap(async (req, res) => {
   const all = req.params.id === 'all';
   const { rows } = await q(`
-    SELECT p.email, p.locale, p.created_at, g.name AS game, s.name AS store, pr.title, pr.code
+    SELECT p.email, p.locale, p.created_at, g.name AS game, s.name AS store, sg.name AS store_group, pr.title, pr.code
     FROM plays p JOIN play_rewards pr ON pr.play_id = p.id JOIN games g ON g.id = p.game_id JOIN stores s ON s.id = g.store_id
+    LEFT JOIN store_groups sg ON sg.id = s.group_id
     WHERE NOT p.is_test AND ($1::boolean OR p.game_id = $2::uuid) AND ($3::uuid IS NULL OR pr.reward_id = $3)
     ORDER BY p.created_at DESC`, [all, all ? null : req.params.id, req.query.reward_id || null]);
-  const head = 'email,store,game,reward,code,language,played_at';
-  const body = rows.map((r) => [r.email, r.store, r.game, r.title?.en, r.code, r.locale, r.created_at.toISOString()].map(csvCell).join(','));
+  const head = 'email,store_group,store,game,reward,code,language,played_at';
+  const body = rows.map((r) => [r.email, r.store_group, r.store, r.game, r.title?.en, r.code, r.locale, r.created_at.toISOString()].map(csvCell).join(','));
   res.type('text/csv').set('Content-Disposition', 'attachment; filename="players.csv"').send([head, ...body].join('\n'));
 }));
 

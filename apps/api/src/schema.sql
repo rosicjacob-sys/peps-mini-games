@@ -70,3 +70,15 @@ ALTER TABLE rewards ADD COLUMN IF NOT EXISTS symbol text;
 
 -- internal test emails: not counted in stats or exports
 ALTER TABLE plays ADD COLUMN IF NOT EXISTS is_test boolean NOT NULL DEFAULT false;
+
+-- store groups: Lexar, Can Peps, Peps USA, ... Each carries the default Resend sender for its stores' games.
+CREATE TABLE IF NOT EXISTS store_groups (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  from_name text NOT NULL DEFAULT '',
+  from_email text NOT NULL DEFAULT '',
+  reply_to text NOT NULL DEFAULT '',
+  sort int NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS group_id uuid REFERENCES store_groups(id) ON DELETE SET NULL;
