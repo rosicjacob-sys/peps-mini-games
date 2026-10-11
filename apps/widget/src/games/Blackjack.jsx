@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { UI } from '@peps/shared';
 import { handValue, canHit, playRound, isBlackjack } from '@peps/shared/blackjack.js';
-import { Card, Deck, DEAL, DEAL_DONE } from './Card.jsx';
+import { Card, Deck, DEAL, DEAL_DONE, CARD_MS, useLanded } from './Card.jsx';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -30,15 +30,16 @@ export default function Blackjack({ result, locale, onDone }) {
   useEffect(() => { const id = setTimeout(() => setReady(true), DEAL_DONE); return () => { alive.current = false; clearTimeout(id); }; }, []);
 
   const player = [...script.player, ...script.playerDraws.slice(0, hits)];
-  const pv = handValue(player);
+  const pLanded = useLanded(player.length), dLanded = useLanded(Math.max(2, dealer.length)); // the hole card is already on the table
+  const pv = handValue(player.slice(0, pLanded));
 
   async function finish(h) {
     setPhase('dealer');
     const round = playRound(script, h);
     await wait(500);
     setDealer(round.dealer.slice(0, 2)); setHole(true);
-    for (let i = 2; i < round.dealer.length; i++) { await wait(850); if (!alive.current) return; setDealer(round.dealer.slice(0, i + 1)); }
-    await wait(600); if (!alive.current) return;
+    for (let i = 2; i < round.dealer.length; i++) { await wait(i === 2 ? 700 : CARD_MS); if (!alive.current) return; setDealer(round.dealer.slice(0, i + 1)); }
+    await wait(round.dealer.length > 2 ? CARD_MS : 600); if (!alive.current) return;
     setBust(!!round.bust);
     // `script.target` is what the server decided; the engine guarantees round.outcome === target.
     setOutcome(script.target); setPhase('done');
@@ -51,7 +52,7 @@ export default function Blackjack({ result, locale, onDone }) {
     if (phase !== 'player' || !canHit(script, hits)) return;
     const h = hits + 1; setHits(h);
     const v = handValue([...script.player, ...script.playerDraws.slice(0, h)]);
-    if (v >= 21) setTimeout(() => finish(h), 700);
+    if (v >= 21) setTimeout(() => finish(h), CARD_MS);
   }
 
   const natural = isBlackjack(script.player);
@@ -63,7 +64,7 @@ export default function Blackjack({ result, locale, onDone }) {
         <Deck />
         <Chips />
         <div className="bj-row">
-          <div className="bj-label">{ui.dealer} {hole ? <b>{handValue(dealer)}</b> : null}</div>
+          <div className="bj-label">{ui.dealer} {hole ? <b>{handValue(dealer.slice(0, dLanded))}</b> : null}</div>
           <div className="bj-cards">
             <Card key="d0" c={dealer[0]} delay={DEAL[1]} />
             <Card key="d1" c={hole ? dealer[1] : null} hidden={!hole} delay={DEAL[3]} />
@@ -73,7 +74,7 @@ export default function Blackjack({ result, locale, onDone }) {
         <ArcText text={locale === 'fr' ? 'LE CROUPIER RESTE À 17' : 'DEALER STANDS ON 17'} />
         <div className="bj-row">
           <div className="bj-cards">{player.map((c, i) => <Card key={`p${i}`} c={c} delay={i === 0 ? DEAL[0] : i === 1 ? DEAL[2] : 0} />)}</div>
-          <div className="bj-label">{ui.you} <b>{pv}</b>{bust || pv > 21 ? ` — ${ui.bust}` : ''}</div>
+          <div className="bj-label">{ui.you} {ready ? <b>{pv}</b> : null}{bust || pv > 21 ? ` — ${ui.bust}` : ''}</div>
         </div>
         </div>
       </div>
