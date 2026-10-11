@@ -9,7 +9,7 @@
 .trigger-suit { color: var(--suit, var(--rim)); font-size: 18px; line-height: 1; }
 @keyframes shine { 0%, 60% { left: -60%; } 100% { left: 130%; } }
 .overlay { position: fixed; inset: 0; z-index: 2147483001; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; padding: 16px; }
-.modal { position: relative; width: 100%; max-width: 420px; max-height: 92vh; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; color: var(--text);
+.modal { position: relative; width: 100%; max-width: 420px; max-height: 92vh; max-height: 92dvh; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; color: var(--text);
   background:
     repeating-linear-gradient(45deg, rgba(255,255,255,.025) 0 2px, transparent 2px 5px),
     radial-gradient(ellipse at 50% -10%, color-mix(in srgb, var(--rim) 22%, transparent), transparent 55%),
@@ -369,10 +369,12 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 22px; f
 .gifts-pick { margin: 0; font-size: 22px; font-weight: 700; color: var(--rim); animation: gift-bob 1.6s ease-in-out infinite; }
 
 /* ---- Plinko ---- */
-.plinko { display: flex; flex-direction: column; gap: 12px; }
+.plinko { display: flex; flex-direction: column; gap: 10px; }
 .plinko .muted { margin: 0; }
 .plinko-board { border-radius: 22px; padding: 6px; background: linear-gradient(160deg, var(--grad1), var(--grad2)); box-shadow: 0 6px 0 color-mix(in srgb, var(--grad2) 55%, #000), 0 14px 26px rgba(0,0,0,.18); }
-.plinko-board svg { display: block; width: 100%; height: auto; }
+/* the board shrinks to whatever height is left in the window, so the game never needs scrolling */
+.plinko-board { display: flex; justify-content: center; }
+.plinko-board svg { display: block; width: 100%; height: auto; max-height: max(230px, calc(92vh - 372px)); max-height: max(230px, calc(92dvh - 372px)); }
 .peg { fill: #fff; filter: drop-shadow(0 1px 1px rgba(0,0,0,.3)); transform-box: fill-box; transform-origin: center; }
 .peg.hit { animation: peg-hit .35s ease-out; }
 @keyframes peg-hit { 0% { fill: var(--accent); transform: scale(1.9); } 100% { fill: #fff; transform: none; } }
@@ -384,9 +386,9 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 22px; f
 .p1 { --pc: var(--pop1); --pf: var(--pop1-fg); } .p2 { --pc: var(--pop2); --pf: var(--pop2-fg); } .p3 { --pc: var(--pop3); --pf: var(--pop3-fg); }
 .p4 { --pc: var(--pop4); --pf: var(--pop4-fg); } .p5 { --pc: var(--pop5); --pf: var(--pop5-fg); } .p6 { --pc: var(--pop6); --pf: var(--pop6-fg); }
 .plose { --pc: #e9e6ef; --pf: #4a4458; }
-.plinko-key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-.plinko-key li { display: flex; align-items: center; gap: 5px; background: var(--pc); color: var(--pf); border-radius: 999px; padding: 4px 10px 4px 6px; font-size: 12px; font-weight: 600; }
-.plinko-key li span { font-size: 15px; }
+.plinko-key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 5px; }
+.plinko-key li { display: flex; align-items: center; gap: 4px; background: var(--pc); color: var(--pf); border-radius: 999px; padding: 3px 9px 3px 5px; font-size: 11.5px; font-weight: 600; line-height: 1.2; }
+.plinko-key li span { font-size: 13px; }
 .plinko-key li.won { outline: 3px solid var(--rim); outline-offset: 1px; animation: pop .4s cubic-bezier(.2,1.6,.4,1); }
 @media (prefers-reduced-motion: reduce) { .pg-arcade .trigger, .gift, .gifts-pick, .arcade-head .spark { animation: none; } }
 .pg-arcade .pick-casino .pick-ico { background: radial-gradient(circle at 35% 30%, #2a6b52, #0b3d2e); border: 2px solid #D6B24A; color: #D6B24A; }

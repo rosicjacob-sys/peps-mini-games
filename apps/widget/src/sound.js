@@ -52,6 +52,9 @@ function noise({ at = 0, a = 0.003, d = 0.1, v = 0.2, type = 'bandpass', f = 200
 const jitter = (x, p = 0.06) => x * (1 + (Math.random() - 0.5) * p);
 const hz = (midi) => 440 * 2 ** ((midi - 69) / 12);
 
+// a glockenspiel-like bell: a few inharmonic partials that ring and fade (higher ones fade sooner)
+const bell = (m, at, v = 0.1, d = 1.2) => [[1, 1], [2.76, 0.35], [5.4, 0.12], [8.93, 0.05]].filter(([mul]) => hz(m) * mul < 16000).forEach(([mul, k]) => tone({ f: hz(m) * mul, at, a: 0.002, d: d / Math.sqrt(mul), v: v * k }));
+
 // ---- effects
 const FX = {
   // a card sliding off the deck
@@ -71,16 +74,32 @@ const FX = {
   // a bright bell: the wheel landing
   ding() { [1568, 2352, 3136].forEach((f, i) => tone({ f, a: 0.002, d: 0.9 - i * 0.2, v: 0.12 / (i + 1) })); },
   // a hand won: quick rising arpeggio
-  win() { [72, 76, 79, 84].forEach((m, i) => { tone({ f: hz(m), type: 'triangle', at: i * 0.085, d: 0.32, v: 0.16 }); tone({ f: hz(m + 12), at: i * 0.085, d: 0.2, v: 0.04 }); }); },
+  // a hand / round won: a glockenspiel "ta-da", a pickup note into a ringing chord with a sparkle run on top
+  win() {
+    bell(79, 0, 0.11, 0.5);
+    [84, 88, 91].forEach((m) => bell(m, 0.13, 0.09, 1.4));
+    [72, 76, 79].forEach((m) => tone({ f: hz(m), type: 'triangle', at: 0.13, a: 0.02, d: 0.9, v: 0.04 }));
+    [96, 100, 103, 108].forEach((m, k) => bell(m, 0.3 + k * 0.05, 0.035, 0.5));
+  },
   // a gentle "not this time": two falling notes
-  lose() { tone({ f: hz(67), f2: hz(66), type: 'triangle', d: 0.32, v: 0.14, lp: 1800 }); tone({ f: hz(63), f2: hz(58), type: 'triangle', at: 0.3, d: 0.6, v: 0.13, lp: 1500 }); },
+  // a gentle "aww": three soft marimba notes stepping down over a warm low note
+  lose() {
+    [[76, 0], [72, 0.17], [69, 0.34]].forEach(([m, at], k) => { tone({ f: hz(m), at, a: 0.004, d: k === 2 ? 0.7 : 0.3, v: 0.15 }); tone({ f: hz(m) * 4, at, a: 0.002, d: 0.07, v: 0.025 }); });
+    tone({ f: hz(45), at: 0.34, a: 0.02, d: 0.8, v: 0.1, lp: 400 });
+  },
   // congratulations: brassy fanfare, a held chord and sparkles
   congrats() {
-    duck(2.6);
-    noise({ d: 0.12, v: 0.3, f: 1400, q: 0.6 });                                   // confetti pop
-    [[67, 0], [72, 0.12], [76, 0.24], [79, 0.36]].forEach(([m, at]) => tone({ f: hz(m), type: 'sawtooth', at, d: 0.2, v: 0.09, lp: 2600 }));
-    [72, 76, 79, 84].forEach((m) => { tone({ f: hz(m), type: 'sawtooth', at: 0.5, a: 0.02, d: 1.3, v: 0.06, lp: 2200 }); tone({ f: hz(m), type: 'triangle', at: 0.5, a: 0.02, d: 1.4, v: 0.06 }); });
-    for (let i = 0; i < 16; i++) tone({ f: 1800 + Math.random() * 2600, at: 0.55 + i * 0.08 + Math.random() * 0.05, a: 0.001, d: 0.25, v: 0.035 });
+    duck(3.2);
+    noise({ d: 0.1, v: 0.25, f: 1400, q: 0.6 });                                          // confetti pop
+    noise({ a: 0.25, d: 0.15, v: 0.12, f: 400, f2: 5000, q: 0.8 });                     // whoosh up
+    // the jackpot chord: bells over a warm pad and a low boom
+    [84, 88, 91, 96].forEach((m) => bell(m, 0.36, 0.085, 1.9));
+    [72, 76, 79].forEach((m) => tone({ f: hz(m), type: 'sawtooth', at: 0.36, a: 0.03, d: 1.5, v: 0.035, lp: 1800 }));
+    tone({ f: hz(48), at: 0.36, a: 0.005, d: 1.1, v: 0.16, lp: 300 });
+    // a cascade of coins, thinning out
+    for (let k = 0; k < 22; k++) { const at = 0.45 + 1.5 * (k / 22) ** 1.4 + Math.random() * 0.04; const f = 2600 + Math.random() * 1600; tone({ f, at, a: 0.001, d: 0.12, v: 0.04 }); tone({ f: f * 1.5, at, a: 0.001, d: 0.07, v: 0.02 }); }
+    // and a final sparkle up
+    [96, 100, 103, 108, 112].forEach((m, k) => bell(m, 1.55 + k * 0.06, 0.04, 0.6));
   },
 };
 
@@ -99,6 +118,43 @@ Object.assign(FX, {
   // a tap on a playful button
   boing() { tone({ f: 300, f2: 620, type: 'sine', d: 0.12, v: 0.18 }); },
 });
+
+// ---- arcade results: chiptune (square waves), like a video game
+// a square-wave note, softened, with an optional pitch slide and vibrato
+function chip(m, at, d, v = 0.06, { slide, vib = 0, type = 'square' } = {}) {
+  const t = ctx.currentTime + at;
+  const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(hz(m), t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(hz(slide), t + d);
+  if (vib) { const l = ctx.createOscillator(); l.frequency.value = 7; const lg = ctx.createGain(); lg.gain.value = hz(m) * vib; l.connect(lg); lg.connect(o.frequency); l.start(t); l.stop(t + d + 0.05); }
+  const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 3800;
+  const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.005); g.gain.setValueAtTime(v, t + d * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(f); f.connect(g); g.connect(fxBus); o.start(t); o.stop(t + d + 0.05);
+}
+const ARCADE_FX = {
+  // power-up: a quick climbing arpeggio, a held top note with vibrato, and a coin blip
+  win() {
+    [72, 76, 79, 84, 88, 91].forEach((m, k) => chip(m, k * 0.045, 0.06, 0.055));
+    chip(96, 0.27, 0.45, 0.05, { vib: 0.012 });
+    chip(83, 0.3, 0.07, 0.05); chip(88, 0.37, 0.35, 0.05);
+    chip(48, 0.27, 0.3, 0.08, { type: 'triangle' });
+  },
+  // a cartoon "wah-wah-waaah": three notes sliding down, the last one wobbling
+  lose() {
+    chip(67, 0, 0.22, 0.05, { slide: 66 }); chip(66, 0.25, 0.22, 0.05, { slide: 65 });
+    chip(65, 0.5, 0.75, 0.05, { slide: 58, vib: 0.03 });
+    chip(43, 0.5, 0.6, 0.07, { type: 'triangle', slide: 38 });
+  },
+  // level complete: a party popper, a snare roll, then a bright jingle over a bouncing bass and a sparkle
+  congrats() {
+    duck(3);
+    noise({ d: 0.12, v: 0.28, f: 1600, q: 0.6 }); noise({ at: 0.03, d: 0.25, v: 0.1, type: 'highpass', f: 5000 });
+    for (let k = 0; k < 8; k++) noise({ at: 0.08 + k * 0.035, d: 0.04, v: 0.06 + k * 0.012, f: 1800, q: 0.7 });
+    const tune = [[67, 0.38, 0.1], [72, 0.48, 0.1], [76, 0.58, 0.1], [79, 0.68, 0.22], [76, 0.92, 0.1], [79, 1.02, 0.1], [84, 1.12, 0.7]];
+    tune.forEach(([m, at, d], k) => chip(m, at, d, 0.055, k === tune.length - 1 ? { vib: 0.012 } : {}));
+    [[48, 0.38], [55, 0.58], [48, 0.78], [55, 0.98], [48, 1.12]].forEach(([m, at], k) => chip(m, at, k === 4 ? 0.6 : 0.16, 0.08, { type: 'triangle' }));
+    [96, 100, 103, 108].forEach((m, k) => chip(m, 1.3 + k * 0.05, 0.08, 0.03));
+  },
+};
 
 // continuous sounds; each returns a stop function
 const LOOPS = {
@@ -240,7 +296,8 @@ export const sound = {
     const was = cfg; cfg = { sfx: s.sfx !== false, music: ['off', 'custom'].includes(s.music) ? s.music : 'builtin', musicUrl: s.musicUrl || '', style };
     if (was.music !== cfg.music || was.musicUrl !== cfg.musicUrl || was.style !== cfg.style) { track?.(); track = null; applyMusic(); }
   },
-  play(name, ...args) { try { if (fxOk() && FX[name]) FX[name](...args); } catch { /* sound is never worth an error */ } },
+  // win / lose / congrats have a casino version (chimes, coins) and an arcade version (chiptune); the rest are shared
+  play(name, ...args) { try { const fx = (cfg.style === 'arcade' && ARCADE_FX[name]) || FX[name]; if (fxOk() && fx) fx(...args); } catch { /* sound is never worth an error */ } },
   loop(name) { try { return LOOPS[name] ? LOOPS[name]() : () => {}; } catch { return () => {}; } },
   music(on) { musicOn = on; applyMusic(); },
   muted: () => muted,
