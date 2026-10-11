@@ -86,3 +86,6 @@ ALTER TABLE stores ADD COLUMN IF NOT EXISTS group_id uuid REFERENCES store_group
 -- casino palettes replaced the neutral ones
 ALTER TABLE games ALTER COLUMN theme SET DEFAULT 'emerald';
 UPDATE games SET theme = 'emerald' WHERE theme IN ('pearl', 'ivory', 'stone', 'silver', 'graphite', 'midnight');
+
+-- each game type has its own default: wheels that were swept onto Emerald go to Burgundy
+UPDATE games SET theme = 'burgundy' WHERE type = 'wheel' AND theme = 'emerald';

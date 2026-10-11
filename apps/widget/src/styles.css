@@ -43,7 +43,13 @@ p { margin: 0; }
 .fine a { color: var(--text); }
 .strong { color: var(--text); font-weight: 600; }
 .wheel-wrap { position: relative; display: flex; flex-direction: column; align-items: center; gap: 16px; padding-top: 14px; }
-.wheel-box { width: min(300px, 78vw); aspect-ratio: 1; border-radius: 50%; overflow: hidden; filter: drop-shadow(0 10px 22px rgba(0,0,0,.45)); }
+.wheel-wrap::before { content: ""; position: absolute; top: 14px; left: 50%; width: min(340px, 90vw); height: min(340px, 90vw); transform: translate(-50%, -6%); border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--rim) 35%, transparent) 0%, transparent 62%); pointer-events: none; }
+.bulb { animation: bulb-idle 1.6s ease-in-out infinite; }
+.wheel.spinning .bulb { animation: bulb-chase .45s linear infinite; }
+@keyframes bulb-idle { 50% { opacity: .55; } }
+@keyframes bulb-chase { 0%, 33% { opacity: 1; } 34%, 100% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .bulb { animation: none; } }
+.wheel-box { position: relative; width: min(300px, 78vw); aspect-ratio: 1; border-radius: 50%; overflow: hidden; filter: drop-shadow(0 12px 26px rgba(0,0,0,.55)) drop-shadow(0 0 18px color-mix(in srgb, var(--rim) 45%, transparent)); }
 .wheel { display: block; width: 100%; height: 100%; }
 .pointer { position: absolute; top: -2px; left: 50%; transform: translateX(-50%); z-index: 2; width: 34px; height: 44px; filter: drop-shadow(0 3px 3px rgba(0,0,0,.45)); }
 .slice.won path, .slice.won circle { animation: slice-glow .7s ease-in-out 3; }

@@ -82,10 +82,11 @@ export default function Wheel({ game, result, locale, onDone }) {
     <div className="wheel-wrap">
       <svg className="pointer" viewBox="0 0 40 52" aria-hidden="true">
         <path d="M20,50 L4,10 Q20,-6 36,10 Z" fill={rim} stroke="rgba(0,0,0,.45)" strokeWidth="1.5" />
-        <circle cx="20" cy="12" r="4.5" fill="rgba(255,255,255,.55)" />
+        <circle cx="20" cy="13" r="6" fill="#b01818" stroke="rgba(0,0,0,.4)" strokeWidth="1" />
+        <circle cx="18" cy="11" r="2.2" fill="rgba(255,255,255,.7)" />
       </svg>
       <div className="wheel-box">
-      <svg viewBox={`0 0 ${R * 2} ${R * 2}`} className="wheel" role="img" aria-label="Prize wheel"
+      <svg viewBox={`0 0 ${R * 2} ${R * 2}`} className={`wheel ${spinning ? 'spinning' : ''}`} role="img" aria-label="Prize wheel"
         style={{ transform: `rotate(${rot}deg)`, transition: spinning ? 'transform 5s cubic-bezier(.12,.6,.1,1)' : 'none' }}
         onTransitionEnd={ended}>
         <defs>
@@ -103,8 +104,8 @@ export default function Wheel({ game, result, locale, onDone }) {
           return (
             <g key={r.id} className={r.id === wonId ? 'slice won' : 'slice'}>
               {n === 1 ? <circle cx={R} cy={R} r={R - 7} fill={fill} stroke={rim} strokeWidth="1.5" />
-                : <path d={`M${R},${R} L${x0},${y0} A${R - 7},${R - 7} 0 ${step > 180 ? 1 : 0} 1 ${x1},${y1} Z`} fill={fill} stroke={rim} strokeWidth="1.5" strokeOpacity=".8" />}
-              <text x={tx} y={ty} fill={th.text} fontSize={f} fontWeight="700" textAnchor="middle" dominantBaseline="middle"
+                : <path d={`M${R},${R} L${x0},${y0} A${R - 7},${R - 7} 0 ${step > 180 ? 1 : 0} 1 ${x1},${y1} Z`} fill={fill} stroke={rim} strokeWidth="2.5" />}
+              <text x={tx} y={ty} fill={th.text} fontSize={f} fontWeight="800" letterSpacing=".06em" style={{ textTransform: 'uppercase' }} textAnchor="middle" dominantBaseline="middle"
                 transform={`rotate(${mid - 90} ${tx} ${ty})`}>
                 {lines.map((l, j) => <tspan key={j} x={tx} dy={j === 0 ? `${-(lines.length - 1) * 0.55}em` : '1.1em'}>{l}</tspan>)}
               </text>
@@ -113,15 +114,23 @@ export default function Wheel({ game, result, locale, onDone }) {
         })}
         <circle cx={R} cy={R} r={R - 7} fill="url(#pg-gloss)" pointerEvents="none" />
         <circle cx={R} cy={R} r={R - 7} fill="url(#pg-edge)" pointerEvents="none" />
-        {/* rim + pegs */}
-        <circle cx={R} cy={R} r={R - 4} fill="none" stroke={rim} strokeWidth="7" />
-        <circle cx={R} cy={R} r={R - 1} fill="none" stroke="rgba(0,0,0,.35)" strokeWidth="1.5" />
-        {Array.from({ length: pegs }, (_, i) => { const [px, py] = polar((360 / pegs) * i, R - 4); return <g key={i}><circle cx={px} cy={py} r="3.2" fill={rim} stroke="rgba(0,0,0,.35)" strokeWidth=".8" /><circle cx={px - 0.9} cy={py - 0.9} r="1.1" fill="rgba(255,255,255,.7)" /></g>; })}
-        {/* hub */}
-        <circle cx={R} cy={R} r="28" fill="rgba(0,0,0,.35)" transform="translate(0 2)" />
-        <circle cx={R} cy={R} r="27" fill="var(--accent)" stroke={rim} strokeWidth="4" />
-        <circle cx={R} cy={R} r="27" fill="url(#pg-hub)" />
-        <circle cx={R} cy={R} r="9" fill={rim} /><circle cx={R - 3} cy={R - 3} r="3" fill="rgba(255,255,255,.6)" />
+        {/* bevelled rim: dark outer, gold band, inner highlight */}
+        <circle cx={R} cy={R} r={R - 1} fill="none" stroke="rgba(0,0,0,.6)" strokeWidth="2" />
+        <circle cx={R} cy={R} r={R - 5} fill="none" stroke={rim} strokeWidth="9" />
+        <circle cx={R} cy={R} r={R - 9.5} fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="1" />
+        <circle cx={R} cy={R} r={R - 1.5} fill="none" stroke="rgba(255,255,255,.25)" strokeWidth="1" />
+        {/* marquee bulbs on the rim — they chase while the wheel spins */}
+        {Array.from({ length: pegs }, (_, i) => { const [px, py] = polar((360 / pegs) * i, R - 5); return (
+          <g key={i} className="bulb" style={{ animationDelay: `${(i % 3) * 0.2}s` }}>
+            <circle cx={px} cy={py} r="3.6" fill="#fff7d6" stroke="rgba(0,0,0,.35)" strokeWidth=".8" />
+            <circle cx={px - 1} cy={py - 1} r="1.3" fill="#fff" />
+          </g>); })}
+        {/* hub: gold bevel with a star */}
+        <circle cx={R} cy={R} r="30" fill="rgba(0,0,0,.4)" transform="translate(0 2)" />
+        <circle cx={R} cy={R} r="29" fill={rim} stroke="rgba(0,0,0,.5)" strokeWidth="1.5" />
+        <circle cx={R} cy={R} r="23" fill="var(--accent)" stroke="rgba(0,0,0,.35)" strokeWidth="1" />
+        <circle cx={R} cy={R} r="23" fill="url(#pg-hub)" />
+        <text x={R} y={R + 1} fill={rim} fontSize="24" textAnchor="middle" dominantBaseline="middle" style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,.6))' }}>★</text>
       </svg>
       </div>
       <button className="btn" disabled={spinning} onClick={go}>{spinning ? ui.spinning : result.rewards.length > 1 ? `${ui.spin} (${spin + 1}/${result.rewards.length})` : ui.spin}</button>

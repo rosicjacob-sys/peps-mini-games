@@ -89,7 +89,7 @@ adminRouter.get('/games/:id', wrap(async (req, res) => {
 function gameFields(b) {
   if (!GAME_TYPES[b.type]) throw Object.assign(new Error('bad_type'), { status: 400 });
   const fixed = GAME_TYPES[b.type].fixedTheme;
-  const theme = fixed || (THEMES[b.theme] && !THEMES[b.theme].locked ? b.theme : DEFAULT_THEME);
+  const theme = fixed || (THEMES[b.theme] && !THEMES[b.theme].locked ? b.theme : (GAME_TYPES[b.type].defaultTheme || DEFAULT_THEME));
   const brand = /^#[0-9a-f]{6}$/i.test(b.brand_accent || '') && !fixed ? b.brand_accent : null;
   const tx = b.texts || {};
   return {
