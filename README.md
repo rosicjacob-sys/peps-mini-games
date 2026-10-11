@@ -12,7 +12,7 @@ render.yaml      Render Blueprint
 ```
 
 ## How it works
-- A **store** has a public key and one or more **games** (`wheel`, `blackjack`; `slots` next).
+- A **store** has a public key and one or more **games** (`wheel`, `blackjack`, `slots`).
 - A game has **rewards**: bilingual title + subtitle, a code that already exists in your discount app, and a
   probability %. Active rewards must total 100%. `Rewards per play` controls how many are drawn per play.
 - The **server** rolls the outcome (the widget only animates it), so odds can't be tampered with in the browser.
@@ -42,5 +42,5 @@ npm run dev:widget     # :5174  → /?store=<public_key>&api=http://localhost:30
 
 ## Roadmap
 - [x] API, dashboard, wheel, EN/FR, weekly limit, Resend, CSV export
-- [ ] Slot machine
+- [x] Slot machine (one payline; all three reels stop on the winning reward's symbol)
 - [x] Blackjack (hit/stand, fixed purple theme; each reward has a "hand result"; the server deals so every hit/stand path ends in that result)

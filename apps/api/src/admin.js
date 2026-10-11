@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
-import { GAME_TYPES, THEMES } from '@peps/shared';
+import { GAME_TYPES, THEMES, SLOT_SYMBOLS } from '@peps/shared';
 import { OUTCOMES } from '@peps/shared/blackjack.js';
 import { q, pool } from './db.js';
 
@@ -65,7 +65,7 @@ function gameFields(b) {
   return {
     type: b.type, name: String(b.name || GAME_TYPES[b.type].label).slice(0, 80),
     status: b.status === 'paused' ? 'paused' : 'active', theme, brand,
-    per: b.type === 'blackjack' ? 1 : Math.min(5, Math.max(1, parseInt(b.rewards_per_play, 10) || 1)),
+    per: ['blackjack', 'slots'].includes(b.type) ? 1 : Math.min(5, Math.max(1, parseInt(b.rewards_per_play, 10) || 1)),
     texts: { heading: loc(tx.heading), subheading: loc(tx.subheading), privacy: loc(tx.privacy), triggerLabel: loc(tx.triggerLabel), privacyUrl: String(tx.privacyUrl || '').slice(0, 300) },
     from_name: String(b.from_name || '').slice(0, 120), from_email: String(b.from_email || '').trim().slice(0, 254), reply_to: String(b.reply_to || '').trim().slice(0, 254),
     subject: loc(b.email_subject),
@@ -92,6 +92,7 @@ adminRouter.put('/games/:id/rewards', wrap(async (req, res) => {
   const { rows: [g] } = await q('SELECT type FROM games WHERE id = $1', [req.params.id]);
   if (!g) return res.sendStatus(404);
   const clean = list.map((r, i) => ({
+    symbol: g.type === 'slots' && SLOT_SYMBOLS.includes(r.symbol) ? r.symbol : null,
     outcome: g.type === 'blackjack' ? (OUTCOMES.includes(r.outcome) ? r.outcome : 'win') : null,
     id: r.id || null, title: loc(r.title), subtitle: loc(r.subtitle), code: String(r.code || '').trim().slice(0, 80),
     probability: Math.max(0, Math.min(100, Number(r.probability) || 0)), active: r.active !== false, sort: i,
@@ -106,8 +107,8 @@ adminRouter.put('/games/:id/rewards', wrap(async (req, res) => {
     const keep = clean.filter((r) => r.id).map((r) => r.id);
     await client.query('DELETE FROM rewards WHERE game_id = $1 AND NOT (id = ANY($2::uuid[]))', [req.params.id, keep]);
     for (const r of clean) {
-      if (r.id) await client.query('UPDATE rewards SET title=$3,subtitle=$4,code=$5,probability=$6,active=$7,sort=$8,outcome=$9 WHERE id=$1 AND game_id=$2', [r.id, req.params.id, r.title, r.subtitle, r.code, r.probability, r.active, r.sort, r.outcome]);
-      else await client.query('INSERT INTO rewards (game_id,title,subtitle,code,probability,active,sort,outcome) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [req.params.id, r.title, r.subtitle, r.code, r.probability, r.active, r.sort, r.outcome]);
+      if (r.id) await client.query('UPDATE rewards SET title=$3,subtitle=$4,code=$5,probability=$6,active=$7,sort=$8,outcome=$9,symbol=$10 WHERE id=$1 AND game_id=$2', [r.id, req.params.id, r.title, r.subtitle, r.code, r.probability, r.active, r.sort, r.outcome, r.symbol]);
+      else await client.query('INSERT INTO rewards (game_id,title,subtitle,code,probability,active,sort,outcome,symbol) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [req.params.id, r.title, r.subtitle, r.code, r.probability, r.active, r.sort, r.outcome, r.symbol]);
     }
     await client.query('COMMIT');
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }

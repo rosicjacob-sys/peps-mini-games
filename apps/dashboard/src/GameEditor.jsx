@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from './api.js';
-import { GAME_TYPES, THEMES, themeFor, t } from '@peps/shared';
+import { GAME_TYPES, THEMES, SLOT_SYMBOLS, themeFor, t } from '@peps/shared';
 
 const TABS = ['Rewards', 'Players', 'Appearance', 'Texts & Email'];
 const blankReward = (type) => ({ title: { en: '', fr: '' }, subtitle: { en: '', fr: '' }, code: '', probability: 0, active: true, ...(type === 'blackjack' ? { outcome: 'win' } : {}) });
@@ -52,7 +52,7 @@ function Rewards({ game, reload }) {
   }
   return (
     <>
-      <p className="muted">Each play, the server picks {game.type === 'blackjack' ? 1 : game.rewards_per_play} reward{game.type !== 'blackjack' && game.rewards_per_play > 1 ? 's' : ''} using these probabilities.{game.type === 'blackjack' && ' The hand is dealt to end with the reward\'s "Hand result", whether the player hits or stands.'} Active rewards must add up to 100%. Codes must already exist in your discount app.</p>
+      <p className="muted">Each play, the server picks {game.type === 'blackjack' || game.type === 'slots' ? 1 : game.rewards_per_play} reward{game.type === 'wheel' && game.rewards_per_play > 1 ? 's' : ''} using these probabilities.{game.type === 'slots' && ' All three reels stop on the winning reward\'s symbol.'}{game.type === 'blackjack' && ' The hand is dealt to end with the reward\'s "Hand result", whether the player hits or stands.'} Active rewards must add up to 100%. Codes must already exist in your discount app.</p>
       {rows.map((r, i) => (
         <div key={r.id || i} className={`card reward-row ${r.active ? '' : 'off'}`}>
           <Loc label="Title" value={r.title} onChange={(v) => set(i, { title: v })} ph="Free Reta" />
@@ -63,6 +63,10 @@ function Rewards({ game, reload }) {
             {game.type === 'blackjack' && (
               <label>Hand result<select value={r.outcome || 'win'} onChange={(e) => set(i, { outcome: e.target.value })}>
                 {Object.entries(HAND_RESULTS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+            )}
+            {game.type === 'slots' && (
+              <label>Reel symbol<select value={r.symbol || ''} onChange={(e) => set(i, { symbol: e.target.value || null })}>
+                <option value="">Auto</option>{SLOT_SYMBOLS.map((x) => <option key={x} value={x}>{x}</option>)}</select></label>
             )}
             <label className="check"><input type="checkbox" checked={r.active} onChange={(e) => set(i, { active: e.target.checked })} /> Active</label>
             <button className="danger" onClick={() => setRows(rows.filter((_, j) => j !== i))}>Remove</button>
@@ -141,7 +145,7 @@ function Settings({ game, reload, section, back }) {
         <>
           <div className="row">
             <label>Status<select value={g.status} onChange={(e) => setG({ ...g, status: e.target.value })}><option value="active">Active (visible on store)</option><option value="paused">Paused (hidden)</option></select></label>
-            {g.type !== 'blackjack' && <label>Rewards per play<input className="num-in" type="number" min="1" max="5" value={g.rewards_per_play} onChange={(e) => setG({ ...g, rewards_per_play: e.target.value })} /></label>}
+            {g.type === 'wheel' && <label>Rewards per play<input className="num-in" type="number" min="1" max="5" value={g.rewards_per_play} onChange={(e) => setG({ ...g, rewards_per_play: e.target.value })} /></label>}
             <label className="grow">Internal name<input value={g.name} onChange={(e) => setG({ ...g, name: e.target.value })} /></label>
           </div>
           <h3>Colour theme</h3>

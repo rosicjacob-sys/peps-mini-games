@@ -21,6 +21,10 @@ export const THEMES = {
   'casino-purple': { label: 'Casino Purple', bg: '#14081F', surface: '#1F0F33', text: '#FFFFFF', muted: '#C4B5FD', accent: '#6B21D8', accentText: '#FFFFFF', border: '#3B1B66', slices: ['#2A1347', '#1F0F33'], locked: true },
 };
 
+// Slot machine symbols. A reward without a chosen symbol gets one by its position.
+export const SLOT_SYMBOLS = ['🍒', '🍋', '🔔', '⭐', '💎', '7️⃣', '🍀', '🎁', '🍇', '👑'];
+export const symbolFor = (reward, index) => reward.symbol || SLOT_SYMBOLS[index % SLOT_SYMBOLS.length];
+
 export const DEFAULT_THEME = 'pearl';
 
 export function themeFor(type, themeKey) {
