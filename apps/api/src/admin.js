@@ -184,10 +184,12 @@ adminRouter.put('/library/:id', wrap(async (req, res) => {
     FROM games g WHERE g.id = r.game_id AND r.library_id = $1`, [req.params.id, f.title, f.subtitle, f.code, f.symbol]);
   res.json({ ...rows[0], games_updated: rowCount });
 }));
+// games that use a deleted reward keep it as their own reward (same code and odds); only the link goes (ON DELETE SET NULL)
 adminRouter.delete('/library/:id', wrap(async (req, res) => {
   const { rows: [u] } = await q('SELECT count(*)::int AS n FROM rewards WHERE library_id = $1', [req.params.id]);
-  if (u.n) return res.status(409).json({ error: `Used by ${u.n} game${u.n === 1 ? '' : 's'} — remove it from those games first.` });
-  await q('DELETE FROM reward_library WHERE id = $1', [req.params.id]); res.sendStatus(204);
+  const { rowCount } = await q('DELETE FROM reward_library WHERE id = $1', [req.params.id]);
+  if (!rowCount) return res.sendStatus(404);
+  res.json({ games_unlinked: u.n });
 }));
 // turn rewards already typed into games into library entries (same code + English title = one entry) and link them
 adminRouter.post('/library/import', wrap(async (_req, res) => {

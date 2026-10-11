@@ -11,6 +11,17 @@ export default function Library() {
   const load = () => api.library().then(setItems);
   useEffect(() => { load(); }, []);
   const doImport = async () => { const r = await api.importLibrary(); setNote(r.created || r.linked ? `Imported ${r.created} reward${r.created === 1 ? '' : 's'} from your games and linked ${r.linked} game reward${r.linked === 1 ? '' : 's'} to them.` : 'Nothing to import — every game reward is already in the library.'); load(); };
+  // games using it keep the reward as their own (same code and odds), so nothing breaks
+  const remove = async (x) => {
+    const names = [...new Set(x.games.map((g) => `${g.game} · ${g.store}`))];
+    const used = x.used_in ? `\n\n${x.used_in} game${x.used_in === 1 ? ' uses' : 's use'} it (${names.slice(0, 3).join(', ')}${names.length > 3 ? `, +${names.length - 3} more` : ''}). ${x.used_in === 1 ? 'That game keeps it as its' : 'Those games keep it as their'} own reward with the same code and odds — remove it from a game in its Rewards tab.` : '';
+    if (!confirm(`Delete "${x.title.en}" from the library?${used}`)) return false;
+    try {
+      const r = await api.deleteLibrary(x.id);
+      setNote(`Deleted "${x.title.en}" from the library.${r?.games_unlinked ? ` ${r.games_unlinked} game reward${r.games_unlinked === 1 ? '' : 's'} kept as custom reward${r.games_unlinked === 1 ? '' : 's'}.` : ''}`);
+      setEditing(null); load(); return true;
+    } catch (e) { setNote(e.message); return false; }
+  };
   const list = (items || []).filter((x) => !q || `${x.title.en} ${x.title.fr} ${x.code}`.toLowerCase().includes(q.toLowerCase()));
   return (
     <>
@@ -25,7 +36,7 @@ export default function Library() {
       )}
       <div className="lib-grid">
         {list.map((x) => editing === x.id
-          ? <LibForm key={x.id} item={x} onCancel={() => setEditing(null)} onSaved={(r) => { setEditing(null); setNote(r?.games_updated ? `Saved — ${r.games_updated} game reward${r.games_updated === 1 ? '' : 's'} updated.` : 'Saved.'); load(); }} />
+          ? <LibForm key={x.id} item={x} onDelete={() => remove(x)} onCancel={() => setEditing(null)} onSaved={(r) => { setEditing(null); setNote(r?.games_updated ? `Saved — ${r.games_updated} game reward${r.games_updated === 1 ? '' : 's'} updated.` : 'Saved.'); load(); }} />
           : (
             <article key={x.id} className="card lib-card">
               <div className="lib-top">
@@ -35,7 +46,7 @@ export default function Library() {
               {x.subtitle?.en && <p className="muted small">{x.subtitle.en}</p>}
               <div className="lib-meta"><code>{x.code}</code><span className="muted small">{x.used_in ? `Used in ${x.used_in} game${x.used_in === 1 ? '' : 's'}` : 'Not used yet'}</span></div>
               {x.used_in > 0 && <p className="muted small lib-games">{x.games.map((g) => `${g.game} · ${g.store}`).join(', ')}</p>}
-              <div className="lib-actions"><button className="ghost small" onClick={() => setEditing(x.id)}>Edit</button></div>
+              <div className="lib-actions"><button className="ghost small danger" onClick={() => remove(x)}>Delete</button><button className="ghost small" onClick={() => setEditing(x.id)}>Edit</button></div>
             </article>
           ))}
       </div>
@@ -48,17 +59,13 @@ export default function Library() {
   );
 }
 
-function LibForm({ item, onCancel, onSaved }) {
+function LibForm({ item, onCancel, onSaved, onDelete }) {
   const [f, setF] = useState(item ? { title: { ...item.title }, subtitle: { en: '', fr: '', ...item.subtitle }, code: item.code, symbol: item.symbol || '' } : blank());
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const setL = (k, l) => (e) => setF({ ...f, [k]: { ...f[k], [l]: e.target.value } });
   async function save(e) {
     e.preventDefault(); setErr(''); setBusy(true);
     try { const r = item ? await api.updateLibrary(item.id, f) : await api.createLibrary(f); onSaved(r); } catch (e2) { setErr(e2.message); } finally { setBusy(false); }
-  }
-  async function del() {
-    if (!confirm(`Delete "${item.title.en}" from the library?`)) return;
-    try { await api.deleteLibrary(item.id); onSaved(); } catch (e2) { setErr(e2.message); }
   }
   return (
     <form className="card lib-form" onSubmit={save}>
@@ -79,7 +86,7 @@ function LibForm({ item, onCancel, onSaved }) {
       <div className="form-actions">
         <button className="primary" disabled={busy}>{item ? 'Save changes' : 'Add to library'}</button>
         <button type="button" className="ghost" onClick={onCancel}>Cancel</button>
-        {item && <button type="button" className="danger push" onClick={del}>Delete…</button>}
+        {item && <button type="button" className="danger push" onClick={onDelete}>Delete…</button>}
       </div>
     </form>
   );
