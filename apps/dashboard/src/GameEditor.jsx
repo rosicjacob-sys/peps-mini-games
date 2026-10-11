@@ -192,7 +192,7 @@ function Settings({ game, reload, section, back }) {
             {' '}The from-address domain must be verified in your Resend account.
           </p>
           <Loc label="Email subject" value={g.email_subject} onChange={(v) => setG({ ...g, email_subject: v })} ph="Your reward code" />
-          <p className="muted">Every code email tells players the offer is only available for a very limited time. Players can play once per week (resets Monday 12:00 AM ET).</p>
+          <p className="muted">Every code email tells players the offer is only available for a very limited time. Each email can play once per week across all of the store's games (resets Monday 12:00 AM ET); a different email can play again.</p>
         </>
       )}
       <div className="row">
