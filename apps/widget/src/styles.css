@@ -87,7 +87,8 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 22px; f
 .bj-card .tl { top: 5px; left: 5px; } .bj-card .br { bottom: 5px; right: 5px; transform: rotate(180deg); }
 .bj-card .cs { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 28px; }
 .bj-card.red { color: #c81e2e; }
-.bj-card.back { background: repeating-linear-gradient(45deg, #6b21d8 0 5px, #4c14a3 5px 10px); border: 3px solid #f4f4f4; box-shadow: 0 6px 12px rgba(0,0,0,.5), inset 0 0 0 1px rgba(214,178,74,.8); }
+.bj-card.back, .bj-card .cback { background: repeating-linear-gradient(45deg, #6b21d8 0 5px, #4c14a3 5px 10px); border: 3px solid #f4f4f4; box-shadow: 0 6px 12px rgba(0,0,0,.5), inset 0 0 0 1px rgba(214,178,74,.8); }
+.bj-card .cback { position: absolute; inset: 0; border-radius: inherit; opacity: 0; box-shadow: inset 0 0 0 1px rgba(214,178,74,.8); pointer-events: none; }
 .bj-arc { width: 100%; height: 44px; margin: -6px 0; opacity: .9; }
 .bj-arc text { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; fill: rgba(214,178,74,.85); }
 .bj-chips { position: absolute; left: 18px; bottom: 44px; width: 36px; height: 36px; }
