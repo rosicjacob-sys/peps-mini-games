@@ -53,3 +53,12 @@ export function secureRandom() {
 }
 
 export const hashIp = (ip) => crypto.createHash('sha256').update(`${ip}|${process.env.JWT_SECRET || ''}`).digest('hex').slice(0, 32);
+
+// Internal test emails: unlimited plays, and their plays are kept out of stats and exports.
+// Override with TEST_EMAILS="a@x.com,b@y.com" on the API.
+const DEFAULT_TEST_EMAILS = ['mosada.jerome.d@gmail.com', 'vantatechca@gmail.com', 'rosicjacob@gmail.com'];
+const TEST_EMAILS = new Set(
+  (process.env.TEST_EMAILS ? process.env.TEST_EMAILS.split(',') : DEFAULT_TEST_EMAILS)
+    .map((e) => normalizeEmail(e)?.norm).filter(Boolean),
+);
+export const isTestEmail = (norm) => TEST_EMAILS.has(norm);

@@ -9,10 +9,22 @@ function Card({ c, hidden, delay = 0 }) {
   const red = c.s === '♥' || c.s === '♦';
   return (
     <div className={`bj-card ${red ? 'red' : ''}`} style={{ animationDelay: `${delay}ms` }}>
-      <span className="r">{c.r}</span><span className="s">{c.s}</span>
+      <span className="ci tl">{c.r}<i>{c.s}</i></span>
+      <span className="cs">{c.s}</span>
+      <span className="ci br">{c.r}<i>{c.s}</i></span>
     </div>
   );
 }
+
+// Table dressing: the dealer's shoe (top right) and a chip stack (bottom left).
+const Shoe = () => <div className="bj-shoe" aria-hidden="true"><i /><i /><i /></div>;
+const Chips = () => <div className="bj-chips" aria-hidden="true"><i /><i /><i /></div>;
+const ArcText = ({ text }) => (
+  <svg className="bj-arc" viewBox="0 0 360 100" aria-hidden="true">
+    <defs><path id="bj-arc-path" d="M6,94 A230,230 0 0 1 354,94" /></defs>
+    <text><textPath href="#bj-arc-path" startOffset="50%" textAnchor="middle">{text}</textPath></text>
+  </svg>
+);
 
 // The server dealt a script that ends in the decided result whatever the player picks.
 // Here the player just chooses hit/stand; the dealer plays out from the server's cards.
@@ -58,6 +70,9 @@ export default function Blackjack({ result, locale, onDone }) {
   return (
     <div className="bj">
       <div className="bj-table">
+        <div className="bj-felt">
+        <Shoe />
+        <Chips />
         <div className="bj-row">
           <div className="bj-label">{ui.dealer} {hole ? <b>{handValue(dealer)}</b> : null}</div>
           <div className="bj-cards">
@@ -65,9 +80,11 @@ export default function Blackjack({ result, locale, onDone }) {
             {hole ? dealer.slice(1).map((c, i) => <Card key={i} c={c} />) : <Card hidden />}
           </div>
         </div>
+        <ArcText text={locale === 'fr' ? 'BLACKJACK PAIE 3 POUR 2 • CROUPIER RESTE À 17' : 'BLACKJACK PAYS 3 TO 2 • DEALER STANDS ON 17'} />
         <div className="bj-row">
           <div className="bj-cards">{player.map((c, i) => <Card key={i} c={c} delay={i >= script.player.length ? 0 : i * 120} />)}</div>
           <div className="bj-label">{ui.you} <b>{pv}</b>{bust || pv > 21 ? ` — ${ui.bust}` : ''}</div>
+        </div>
         </div>
       </div>
       {phase === 'done' ? (

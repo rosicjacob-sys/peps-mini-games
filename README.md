@@ -51,6 +51,10 @@ Optional attributes on the `<script>` tag:
 
 Changing a `VITE_*` var needs a redeploy of that static site.
 
+**Test emails.** `mosada.jerome.d@gmail.com`, `vantatechca@gmail.com` and `rosicjacob@gmail.com` can play without
+limit; their plays are not counted in stats, tallies or exports, and they still receive the code email. Change the
+list with `TEST_EMAILS=a@x.com,b@y.com` on the API service.
+
 ## Local dev
 ```
 npm install
