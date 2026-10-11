@@ -12,7 +12,7 @@ label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(
 label.check { flex-direction:row; align-items:center; flex:none; min-width:auto; width:auto; white-space:nowrap; color:var(--ink); padding-top:18px; gap:6px; }
 .num-in { width:110px; } .row { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; } .row.between { justify-content:space-between; align-items:center; }
 .loc { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px; } .form label { margin-bottom:10px; } .form .row label { margin-bottom:0; }
-.tag { display:inline-block; margin-left:4px; background:var(--bg); border-radius:4px; padding:0 5px; font-size:10px; font-weight:700; color:var(--ink); }
+.tag { align-self:flex-start; display:inline-block; margin-left:4px; background:var(--bg); border-radius:4px; padding:0 5px; font-size:10px; font-weight:700; color:var(--ink); }
 button { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:#fff; cursor:pointer; }
 button:hover { background:var(--bg); } button:disabled { opacity:.5; cursor:default; }
 button.primary { background:var(--brand); color:#fff; border-color:var(--brand); } button.primary:hover { filter:brightness(1.2); background:var(--brand); }

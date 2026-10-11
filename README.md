@@ -21,6 +21,26 @@ render.yaml      Render Blueprint
 - The code is shown on screen and emailed through Resend (from-address is set per game).
 - Dashboard → Players: plays, unique emails, tally per reward, emails per reward, CSV export.
 
+## Visitor flow
+1. Visitor passes the theme's age verification.
+2. On the **homepage only**, a "Play to Win" popup appears right away (once per visit). Copy, steps, buttons and an
+   optional image are edited per game in the dashboard (**Intro popup** tab, English + French). Visitors can switch
+   EN / FR with the toggle; their choice is remembered and also sets the language of the code email.
+3. **Play now** → email step (privacy notice) → game → code on screen + by email. **No thanks** closes it; the floating
+   button stays. The popup does not return the same visit, and stays away after a play until the next week.
+
+The popup waits for the age gate by watching for an element matching `[id*="age-gate"], [class*="age-gate"], [data-age-gate]`
+(matches the Lexar theme's `#meridian-age-gate`). If a store group's theme uses a different gate, set it on the script tag.
+
+Optional attributes on the `<script>` tag:
+
+| Attribute | Purpose |
+|---|---|
+| `data-locale` | Starting language (`en` / `fr`), e.g. `{{ request.locale.iso_code }}` |
+| `data-age-selector` | CSS selector of that theme's age-verification dialog |
+| `data-intro-pages` | `all` to show the popup on every page (default: homepage only) |
+| `data-game` | Only offer one game type (`wheel`, `blackjack`, `slots`) |
+
 ## Deploy on Render
 1. Render → **New → Blueprint** → select this repo. It creates the database, API, dashboard and widget.
 2. Fill the prompted env vars: `DASHBOARD_PASSWORD`, `RESEND_API_KEY`, `DASHBOARD_ORIGIN` (dashboard URL),

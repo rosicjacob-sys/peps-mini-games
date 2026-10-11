@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from './api.js';
-import { GAME_TYPES, THEMES, SLOT_SYMBOLS, themeFor, t } from '@peps/shared';
+import { GAME_TYPES, THEMES, SLOT_SYMBOLS, INTRO_DEFAULTS, themeFor, t } from '@peps/shared';
 
-const TABS = ['Rewards', 'Players', 'Appearance', 'Texts & Email'];
+const TABS = ['Rewards', 'Players', 'Intro popup', 'Appearance', 'Texts & Email'];
 const blankReward = (type) => ({ title: { en: '', fr: '' }, subtitle: { en: '', fr: '' }, code: '', probability: 0, active: true, ...(type === 'blackjack' ? { outcome: 'win' } : {}) });
 const HAND_RESULTS = { blackjack: 'Blackjack (21)', win: 'Player wins', push: 'Push (tie)', loss: 'Dealer wins' };
 
@@ -17,6 +17,7 @@ export default function GameEditor({ id, back }) {
       <div className="tabs">{TABS.map((x) => <button key={x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{x}</button>)}</div>
       {tab === 'Rewards' && <Rewards game={game} reload={load} />}
       {tab === 'Players' && <Players game={game} />}
+      {tab === 'Intro popup' && <Settings game={game} reload={load} section="intro" />}
       {tab === 'Appearance' && <Settings game={game} reload={load} section="appearance" />}
       {tab === 'Texts & Email' && <Settings game={game} reload={load} section="texts" back={back} />}
     </>
@@ -172,6 +173,7 @@ function Settings({ game, reload, section, back }) {
           </div>
         </>
       )}
+      {section === 'intro' && <IntroEditor g={g} setT={setT} />}
       {section === 'texts' && (
         <>
           <h3>Game text</h3>
@@ -196,5 +198,50 @@ function Settings({ game, reload, section, back }) {
         {back && <button className="danger push" onClick={async () => { if (confirm('Delete this game with all its rewards and plays?')) { await api.deleteGame(g.id); back(); } }}>Delete game</button>}
       </div>
     </div>
+  );
+}
+
+const L = (en, fr) => ({ en, fr });
+const copyDefaults = () => ({
+  enabled: true, image: '',
+  heading: L(INTRO_DEFAULTS.en.heading, INTRO_DEFAULTS.fr.heading),
+  description: L(INTRO_DEFAULTS.en.description, INTRO_DEFAULTS.fr.description),
+  steps: INTRO_DEFAULTS.en.steps.map((x, i) => L(x, INTRO_DEFAULTS.fr.steps[i])),
+  note: L(INTRO_DEFAULTS.en.note, INTRO_DEFAULTS.fr.note),
+  playLabel: L(INTRO_DEFAULTS.en.playLabel, INTRO_DEFAULTS.fr.playLabel),
+  declineLabel: L(INTRO_DEFAULTS.en.declineLabel, INTRO_DEFAULTS.fr.declineLabel),
+});
+
+// The "Play to Win" popup visitors see on the homepage right after age verification.
+function IntroEditor({ g, setT }) {
+  const intro = { enabled: true, image: '', steps: [], ...(g.texts.intro || {}) };
+  const set = (patch) => setT('intro', { ...intro, ...patch });
+  const ph = (k, l) => INTRO_DEFAULTS[l][k];
+  const setStep = (i, v) => set({ steps: intro.steps.map((x, j) => (j === i ? v : x)) });
+  return (
+    <>
+      <div className="row">
+        <label className="check"><input type="checkbox" checked={intro.enabled} onChange={(e) => set({ enabled: e.target.checked })} /> Show the popup on the homepage</label>
+        <button onClick={() => set(copyDefaults())}>Fill with suggested copy</button>
+      </div>
+      <p className="muted">Shown on the homepage only, every visit, right after the age verification closes. Visitors can pick English or French in the popup. Blank fields use the suggested copy shown in grey.</p>
+      <Loc label="Heading" value={intro.heading} onChange={(v) => set({ heading: v })} ph={ph('heading', 'en')} />
+      <Loc label="Description" rows="3" value={intro.description} onChange={(v) => set({ description: v })} ph={ph('description', 'en')} />
+      <h3>How to win (steps)</h3>
+      {intro.steps.map((st, i) => (
+        <div key={i} className="row">
+          <div className="loc grow">
+            {['en', 'fr'].map((l) => <label key={l}>Step {i + 1} <span className="tag">{l.toUpperCase()}</span><input value={st[l] || ''} onChange={(e) => setStep(i, { ...st, [l]: e.target.value })} /></label>)}
+          </div>
+          <button className="danger" onClick={() => set({ steps: intro.steps.filter((_, j) => j !== i) })}>Remove</button>
+        </div>
+      ))}
+      {intro.steps.length < 6 && <button onClick={() => set({ steps: [...intro.steps, L('', '')] })}>+ Add step</button>}
+      {!intro.steps.length && <p className="muted">No steps set — the 3 suggested steps are shown.</p>}
+      <Loc label="Small print" rows="2" value={intro.note} onChange={(v) => set({ note: v })} ph={ph('note', 'en')} />
+      <div className="row"><Loc label="Play button" value={intro.playLabel} onChange={(v) => set({ playLabel: v })} ph={ph('playLabel', 'en')} /></div>
+      <Loc label="Decline button" value={intro.declineLabel} onChange={(v) => set({ declineLabel: v })} ph={ph('declineLabel', 'en')} />
+      <label>Image URL <span className="muted">(optional, https only)</span><input value={intro.image || ''} onChange={(e) => set({ image: e.target.value })} placeholder="https://…" /></label>
+    </>
   );
 }

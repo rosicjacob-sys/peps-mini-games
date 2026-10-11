@@ -59,6 +59,24 @@ export const UI = {
   },
 };
 
+// Default copy for the "Play to Win" intro popup. Every field is editable per game in the dashboard.
+export const INTRO_DEFAULTS = {
+  en: {
+    heading: 'Play to Win!',
+    description: 'Play a quick game for a chance to win exclusive discount codes, free gifts and other exciting rewards.',
+    steps: ['Enter your email address', 'Play the game', "Get your reward code instantly — we'll email it to you too"],
+    note: 'Everyone who plays gets a reward. Codes are single-use and expire every Sunday at 11:59 PM ET. One play per week.',
+    playLabel: 'Play now', declineLabel: 'No thanks',
+  },
+  fr: {
+    heading: 'Jouez pour gagner!',
+    description: 'Jouez à un jeu rapide pour courir la chance de gagner des codes de réduction exclusifs, des cadeaux gratuits et d’autres récompenses intéressantes.',
+    steps: ['Entrez votre adresse courriel', 'Jouez au jeu', 'Recevez votre code tout de suite — nous vous l’envoyons aussi par courriel'],
+    note: 'Tous les participants reçoivent une récompense. Les codes sont à usage unique et expirent chaque dimanche à 23 h 59 (HE). Une partie par semaine.',
+    playLabel: 'Jouer maintenant', declineLabel: 'Non merci',
+  },
+};
+
 export function pickLocale(v) {
   const l = String(v || '').toLowerCase().slice(0, 2);
   return LOCALES.includes(l) ? l : 'en';
