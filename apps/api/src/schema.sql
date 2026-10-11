@@ -101,3 +101,15 @@ CREATE INDEX IF NOT EXISTS play_rewards_play_idx ON play_rewards(play_id);
 
 -- chance (percent) that a play wins nothing; active reward probabilities + lose_percent = 100
 ALTER TABLE games ADD COLUMN IF NOT EXISTS lose_percent numeric(6,3) NOT NULL DEFAULT 0;
+
+-- shared rewards library: entered once, picked by any game (each game keeps its own probability)
+CREATE TABLE IF NOT EXISTS reward_library (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title jsonb NOT NULL,                 -- {en,fr}
+  subtitle jsonb NOT NULL DEFAULT '{}', -- {en,fr}
+  code text NOT NULL,
+  symbol text,                          -- default slot icon
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE rewards ADD COLUMN IF NOT EXISTS library_id uuid REFERENCES reward_library(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS rewards_library_idx ON rewards(library_id);

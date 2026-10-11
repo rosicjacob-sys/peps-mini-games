@@ -39,6 +39,10 @@ const Loc = ({ label, value, onChange, ph, rows }) => (
 
 function Rewards({ game, reload }) {
   const [rows, setRows] = useState(game.rewards.map((r) => ({ ...r, probability: Number(r.probability) })));
+  const [library, setLibrary] = useState([]); const [picking, setPicking] = useState(false);
+  useEffect(() => { api.library().then(setLibrary); }, []);
+  const inGame = new Set(rows.map((r) => r.library_id).filter(Boolean));
+  const addFromLibrary = (items) => { setRows([...rows, ...items.map((l) => ({ library_id: l.id, title: l.title, subtitle: l.subtitle, code: l.code, symbol: l.symbol, probability: 0, active: true }))]); setPicking(false); };
   const [msg, setMsg] = useState(''); const [err, setErr] = useState('');
   const [lose, setLose] = useState(Number(game.lose_percent) || 0);   // chance a play wins nothing
   const total = useMemo(() => rows.filter((r) => r.active).reduce((s, r) => s + (Number(r.probability) || 0), 0) + (Number(lose) || 0), [rows, lose]);
@@ -62,13 +66,26 @@ function Rewards({ game, reload }) {
     <>
       <p className="muted">Each play, the server picks {singleReward(game.type) ? 1 : game.rewards_per_play} reward{game.type === 'wheel' && game.rewards_per_play > 1 ? 's' : ''} using these probabilities.{game.type === 'slots' && ' All three reels stop on the winning reward\'s symbol.'}{game.type === 'poker' && ' Each reward is paid on a poker hand: the more likely the reward, the weaker the hand.'}{game.type === 'color' && ' Each active reward sits on one of six colours, in this order.'}{['lucky9', 'baccarat'].includes(game.type) && ' The player wins the hand, then spins a wheel; these probabilities decide where it lands.'}{game.type === 'blackjack' && ' The player wins a warm-up hand, then spins a wheel; these probabilities decide where the wheel lands.'} Active rewards must add up to 100%. Codes must already exist in your discount app.</p>
       {rows.map((r, i) => (
-        <div key={r.id || i} className={`card reward-row ${r.active ? '' : 'off'}`}>
-          <Loc label="Title" value={r.title} onChange={(v) => set(i, { title: v })} ph="Free Reta" />
-          <Loc label="Subtitle" value={r.subtitle} onChange={(v) => set(i, { subtitle: v })} ph="One vial on us" />
+        <div key={r.id || i} className={`card reward-row ${r.active ? '' : 'off'} ${r.library_id ? 'linked' : ''}`}>
+          {r.library_id ? (
+            <div className="linked-head">
+              <span className="lib-icon" aria-hidden="true">{r.symbol || '🎁'}</span>
+              <div className="lib-text"><b>{t(r.title, 'en')}</b><span className="muted small">{[t(r.title, 'fr'), t(r.subtitle, 'en')].filter(Boolean).join(' · ')}</span></div>
+              <code>{r.code}</code>
+              <span className="pill">Library</span>
+              <a className="small" href="#/rewards">Edit in library</a>
+              <button className="link small" onClick={() => set(i, { library_id: null })} title="Keep a separate copy you can edit just for this game">Make custom</button>
+            </div>
+          ) : (
+            <>
+              <Loc label="Title" value={r.title} onChange={(v) => set(i, { title: v })} ph="Free Reta" />
+              <Loc label="Subtitle" value={r.subtitle} onChange={(v) => set(i, { subtitle: v })} ph="One vial on us" />
+            </>
+          )}
           <div className="row">
-            <label>Code<input value={r.code} onChange={(e) => set(i, { code: e.target.value })} placeholder="FREERETA" /></label>
+            {!r.library_id && <label>Code<input value={r.code} onChange={(e) => set(i, { code: e.target.value })} placeholder="FREERETA" /></label>}
             <label>Probability %<input className="num-in" type="number" min="0" max="100" step="0.5" value={r.probability} onChange={(e) => set(i, { probability: e.target.value })} /></label>
-            {game.type === 'slots' && (
+            {game.type === 'slots' && !r.library_id && (
               <label>Reel icon<select value={r.symbol || ''} onChange={(e) => set(i, { symbol: e.target.value || null })}>
                 <option value="">Auto</option>{SLOT_ICONS.map((x) => <option key={x.key} value={x.glyph}>{x.glyph} {x.label}</option>)}</select></label>
             )}
@@ -80,6 +97,9 @@ function Rewards({ game, reload }) {
           </div>
         </div>
       ))}
+      {!rows.length && <div className="card empty-state"><b>No rewards in this game yet</b><p className="muted">Add rewards from your library, then set how likely each one is.</p>
+        <button className="primary" onClick={() => setPicking(true)}>+ Add from library</button></div>}
+      {picking && <LibraryPicker library={library} inGame={inGame} onAdd={addFromLibrary} onClose={() => setPicking(false)} />}
       <div className="card reward-row lose-row">
         <div className="row">
           <div className="grow"><b>No reward — the player loses</b>
@@ -88,7 +108,8 @@ function Rewards({ game, reload }) {
         </div>
       </div>
       <div className="row sticky">
-        <button onClick={() => setRows([...rows, blankReward()])}>+ Add reward</button>
+        <button className="primary-outline" onClick={() => setPicking(true)}>+ Add from library</button>
+        <button onClick={() => setRows([...rows, blankReward()])}>+ Custom reward</button>
         <button onClick={equalise}>Split evenly</button>
         <strong className={ok ? 'good' : 'bad'}>Total: {total.toFixed(2)}%</strong>
         <button className="primary" disabled={!ok && rows.some((r) => r.active)} onClick={save}>Save rewards</button>
@@ -216,5 +237,37 @@ function IntroEditor({ g, setT }) {
       <Loc label="Decline button" value={intro.declineLabel} onChange={(v) => set({ declineLabel: v })} ph={ph('declineLabel', 'en')} />
       <label>Image URL <span className="muted">(optional, https only)</span><input value={intro.image || ''} onChange={(e) => set({ image: e.target.value })} placeholder="https://…" /></label>
     </>
+  );
+}
+
+// pick several library rewards at once; ones already in the game are greyed out
+function LibraryPicker({ library, inGame, onAdd, onClose }) {
+  const [sel, setSel] = useState(new Set()); const [q, setQ] = useState('');
+  const toggle = (id) => { const n = new Set(sel); n.has(id) ? n.delete(id) : n.add(id); setSel(n); };
+  const list = library.filter((x) => !q || `${x.title.en} ${x.code}`.toLowerCase().includes(q.toLowerCase()));
+  return (
+    <div className="drawer-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <aside className="drawer" role="dialog" aria-label="Add rewards from library">
+        <header className="drawer-head"><div><p className="muted small">Rewards library</p><h2>Add rewards to this game</h2></div><button className="ghost icon" onClick={onClose} aria-label="Close">✕</button></header>
+        {!library.length ? (
+          <div className="empty-state"><p className="muted">Your library is empty.</p><a className="small" href="#/rewards">Open the Rewards library</a></div>
+        ) : (
+          <>
+            <div className="search"><input placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search library" /></div>
+            <div className="pick-list">
+              {list.map((x) => { const used = inGame.has(x.id); return (
+                <label key={x.id} className={`pick-row ${used ? 'used' : ''} ${sel.has(x.id) ? 'on' : ''}`}>
+                  <input type="checkbox" disabled={used} checked={sel.has(x.id)} onChange={() => toggle(x.id)} />
+                  <span className="lib-icon" aria-hidden="true">{x.symbol || '🎁'}</span>
+                  <span className="lib-text"><b>{x.title.en}</b><span className="muted small">{x.title.fr}</span></span>
+                  <code>{x.code}</code>{used && <span className="pill">in game</span>}
+                </label>); })}
+            </div>
+            <div className="form-actions"><button className="primary" disabled={!sel.size} onClick={() => onAdd(library.filter((x) => sel.has(x.id)))}>Add {sel.size || ''} reward{sel.size === 1 ? '' : 's'}</button>
+              <button className="ghost" onClick={onClose}>Cancel</button><a className="small push" href="#/rewards">Manage library</a></div>
+          </>
+        )}
+      </aside>
+    </div>
   );
 }

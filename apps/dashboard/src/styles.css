@@ -96,7 +96,7 @@ pre { background: var(--surface-2); padding: 12px; border-radius: 8px; overflow:
 /* ===== page ===== */
 .page-head { display: flex; align-items: flex-end; gap: 16px; justify-content: space-between; margin-bottom: 18px; }
 .page-head p { margin-top: 4px; }
-.page-actions { display: flex; gap: 8px; }
+.page-actions { display: flex; gap: 8px; flex: none; } .page-actions button { white-space: nowrap; }
 .back { margin-bottom: 8px; padding-left: 0; }
 .stack { display: flex; flex-direction: column; gap: 16px; }
 .refetch { opacity: .55; transition: opacity .2s; pointer-events: none; }
@@ -312,3 +312,24 @@ td > .pill:first-child { margin-left: 0; }
 
 .lose-row { border-style: dashed; }
 .lose-row .grow { flex: 3; display: flex; flex-direction: column; gap: 4px; }
+
+/* ===== rewards library ===== */
+.lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; align-items: stretch; }
+.lib-card .lib-actions { margin-top: auto; }
+.lib-grid > .lib-form { grid-column: 1 / -1; }
+.lib-card { display: flex; flex-direction: column; gap: 8px; }
+.lib-top, .linked-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.lib-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--surface-2); display: grid; place-items: center; font-size: 20px; flex: none; }
+.lib-text { display: flex; flex-direction: column; min-width: 0; } .lib-text b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; } .lib-meta code { margin-left: 0; }
+.lib-games { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-actions { display: flex; justify-content: flex-end; }
+.lib-form h2 { margin-bottom: 12px; }
+.reward-row.linked .linked-head { flex-wrap: wrap; margin-bottom: 12px; } .reward-row.linked .linked-head .lib-text { flex: 1; min-width: 160px; }
+.reward-row.linked .linked-head .pill { margin-left: 0; } .reward-row.linked .linked-head a { color: var(--s1); }
+button.primary-outline { border-color: var(--primary); font-weight: 650; }
+.pick-list { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 16px; }
+.pick-row { flex-direction: row; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; color: var(--ink); font-weight: 500; min-width: 0; }
+.pick-row .lib-text { flex: 1; } .pick-row code { margin-left: 0; }
+.pick-row:hover { background: var(--surface-2); } .pick-row.on { border-color: var(--s1); box-shadow: 0 0 0 1px var(--s1); }
+.pick-row.used { opacity: .55; cursor: default; } .pick-row .pill { margin-left: 0; }

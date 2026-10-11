@@ -14,6 +14,9 @@ render.yaml      Render Blueprint
 ## How it works
 - **Store groups** (e.g. Lexar, Can Peps, Peps USA) are created in the dashboard; each store is assigned to one. A group
   carries the default Resend sender (From name / email / reply-to) for every game in its stores; a game can override it.
+- **Rewards library**: rewards (EN/FR title + subtitle, code, slot icon) are entered once and added to any game; each
+  game sets only the probability. Editing a library reward updates every game using it. "Import from my games" turns
+  rewards already typed into games into library entries and links them. One-off rewards can still be custom per game.
 - A **store** has a public key and one or more **games** (`wheel`, `blackjack`, `slots`).
 - A game has **rewards**: bilingual title + subtitle, a code that already exists in your discount app, and a
   probability %. Active rewards must total 100%. `Rewards per play` controls how many are drawn per play.
