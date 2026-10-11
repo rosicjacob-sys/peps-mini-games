@@ -18,7 +18,7 @@ export const THEMES = {
   'silver':   { label: 'Silver',   bg: '#D1D5DB', surface: '#F3F4F6', text: '#111827', muted: '#4B5563', accent: '#1F2937', accentText: '#FFFFFF', border: '#9CA3AF', slices: ['#F3F4F6', '#CBD0D8'], wheel: ['#F3F4F6', '#CBD0D8', '#E5E7EB', '#B8BEC7'], rim: '#1F2937' },
   'graphite': { label: 'Graphite', bg: '#2A2A2D', surface: '#37373B', text: '#F4F4F5', muted: '#A1A1AA', accent: '#E4E4E7', accentText: '#18181B', border: '#4A4A50', slices: ['#3F3F45', '#2F2F34'], wheel: ['#3F3F45', '#2F2F34', '#4A4A50', '#2A2A2D'], rim: '#E4E4E7' },
   'midnight': { label: 'Midnight', bg: '#0F1115', surface: '#1A1D23', text: '#F5F5F5', muted: '#9AA0AA', accent: '#F5F5F5', accentText: '#0F1115', border: '#2B3038', slices: ['#22262D', '#171A20'], wheel: ['#22262D', '#171A20', '#2B3038', '#1C2027'], rim: '#F5F5F5' },
-  'casino-purple': { label: 'Casino Purple', bg: '#14081F', surface: '#1F0F33', text: '#FFFFFF', muted: '#C4B5FD', accent: '#6B21D8', accentText: '#FFFFFF', border: '#3B1B66', slices: ['#2A1347', '#1F0F33'], wheel: ['#6D28D9', '#3B0764', '#8B5CF6', '#4C1D95'], rim: '#D6B24A', locked: true },
+  'casino-purple': { label: 'Casino Purple', bg: '#14081F', surface: '#1F0F33', text: '#FFFFFF', muted: '#C4B5FD', accent: '#6B21D8', accentText: '#FFFFFF', border: '#3B1B66', slices: ['#2A1347', '#1F0F33'], wheel: ['#6D28D9', '#3B0764', '#8B5CF6', '#4C1D95'], rim: '#D6B24A', rimText: '#1f1230', marquee: 'gold', locked: true },
 };
 
 // Slot machine symbols. A reward without a chosen symbol gets one by its position.

@@ -11,9 +11,14 @@ const GAMES = { wheel: [Wheel], blackjack: [Blackjack, Wheel], slots: [Slots] };
 function cssVars(game) {
   const th = themeFor(game.type, game.theme);
   const accent = (!GAME_TYPES[game.type]?.fixedTheme && game.brandAccent) || th.accent;
+  const rim = th.rim || accent;
+  const gold = th.marquee === 'gold';
   return {
     '--bg': th.bg, '--surface': th.surface, '--text': th.text, '--muted': th.muted,
     '--accent': accent, '--accent-text': game.brandAccent && !GAME_TYPES[game.type]?.fixedTheme ? '#fff' : th.accentText, '--border': th.border,
+    '--rim': rim, '--rim-text': th.rimText || th.accentText,
+    // headline fill: gold leaf on the casino theme, the rim colour elsewhere
+    '--marquee': gold ? 'linear-gradient(180deg,#fff6c8 0%,#f1d57a 35%,#b8891f 55%,#ffe79a 80%,#d6b24a 100%)' : `linear-gradient(${rim},${rim})`,
   };
 }
 
@@ -105,7 +110,7 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
 
   return (
     <div style={cssVars(current)}>
-      <button className="trigger" onClick={() => setOpen(true)}>{label}</button>
+      <button className="trigger" onClick={() => setOpen(true)}><span className="trigger-suit" aria-hidden="true">♠</span>{label}</button>
       {intro && !open && <Intro game={current} locale={locale} setLocale={setLocale} onPlay={() => finishIntro(true)} onDecline={() => finishIntro(false)} />}
       {open && (
         <div className="overlay" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
@@ -126,6 +131,9 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
   );
 }
 
+// A row of twinkling marquee bulbs.
+const Bulbs = () => <div className="bulbs" aria-hidden="true">{Array.from({ length: 11 }, (_, i) => <i key={i} style={{ animationDelay: `${(i % 3) * 0.33}s` }} />)}</div>;
+
 // "Play to Win" popup. Copy comes from the dashboard; blank fields fall back to the defaults.
 function Intro({ game, locale, setLocale, onPlay, onDecline }) {
   const cfg = game.texts?.intro || {};
@@ -139,10 +147,12 @@ function Intro({ game, locale, setLocale, onPlay, onDecline }) {
         <LangToggle locale={locale} setLocale={setLocale} />
         <button className="close" aria-label={UI[locale].close} onClick={onDecline}>×</button>
         {cfg.image && <img className="intro-img" src={cfg.image} alt="" />}
-        <h2 id="pg-intro-title">{pick('heading')}</h2>
+        <Bulbs />
+        <h2 id="pg-intro-title" className="marquee">{pick('heading')}</h2>
+        <div className="suits" aria-hidden="true"><span>♠</span><span>♥</span><span>♦</span><span>♣</span></div>
         <p className="intro-desc">{pick('description')}</p>
         <ol className="steps">{list.map((x, i) => <li key={i}><span>{i + 1}</span>{x}</li>)}</ol>
-        <button className="btn" onClick={onPlay} autoFocus>{pick('playLabel')}</button>
+        <button className="btn play" onClick={onPlay} autoFocus>{pick('playLabel')}</button>
         <button className="btn ghost" onClick={onDecline}>{pick('declineLabel')}</button>
         <p className="fine">{pick('note')}</p>
       </div>
@@ -210,7 +220,7 @@ function Play({ game, api, store, locale, onClose }) {
   return (
     <div className="screen result">
       <Confetti />
-      <h2 className="congrats">{ui.congrats}</h2>
+      <h2 className="congrats marquee">{ui.congrats}</h2>
       <p className="muted won">{result.rewards.length > 1 ? ui.yourRewards : ui.yourReward}</p>
       {result.rewards.map((r) => <RewardCard key={r.id} r={r} locale={locale} />)}
       <p className="redeem">🛒 {ui.redeem}</p>

@@ -1,13 +1,19 @@
 :host, div { box-sizing: border-box; }
 * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-.trigger { position: fixed; right: 20px; bottom: 20px; z-index: 2147483000; background: var(--accent); color: var(--accent-text); border: 1px solid var(--border);
-  border-radius: 999px; padding: 12px 20px; font-size: 15px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+.trigger { position: fixed; right: 20px; bottom: 20px; z-index: 2147483000; display: flex; align-items: center; gap: 8px; overflow: hidden;
+  background: var(--accent); color: var(--accent-text); border: 2px solid var(--rim); border-radius: 999px; padding: 10px 22px 9px;
+  font-family: "Bebas Neue", Impact, "Arial Narrow Bold", sans-serif; font-size: 20px; letter-spacing: .08em; line-height: 1; cursor: pointer;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rim) 28%, transparent), 0 8px 22px rgba(0,0,0,.35); }
+.trigger::after { content: ""; position: absolute; top: -40%; left: -60%; width: 40%; height: 180%; transform: rotate(20deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: shine 3.2s ease-in-out infinite; }
 .trigger:hover { filter: brightness(1.08); }
+.trigger-suit { color: var(--rim); font-size: 18px; line-height: 1; }
+@keyframes shine { 0%, 60% { left: -60%; } 100% { left: 130%; } }
 .overlay { position: fixed; inset: 0; z-index: 2147483001; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .modal { position: relative; width: 100%; max-width: 420px; max-height: 92vh; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 18px; padding: 28px 22px 22px; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
 .close { position: absolute; top: 8px; right: 12px; background: none; border: 0; color: var(--muted); font-size: 28px; line-height: 1; cursor: pointer; }
 .screen { display: flex; flex-direction: column; gap: 14px; text-align: center; }
-h2 { margin: 0; font-size: 24px; line-height: 1.2; }
+h2 { margin: 0; font-family: "Bebas Neue", Impact, "Arial Narrow Bold", sans-serif; font-weight: 400; font-size: 32px; letter-spacing: .06em; line-height: 1.05; }
+.marquee { background: var(--marquee); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 0 rgba(0,0,0,.35)) drop-shadow(0 0 14px color-mix(in srgb, var(--rim) 45%, transparent)); }
 p { margin: 0; }
 .muted { color: var(--muted); font-size: 14px; }
 .field { display: flex; flex-direction: column; gap: 6px; text-align: left; font-size: 13px; color: var(--muted); }
@@ -89,12 +95,23 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 22px; f
 .lang { position: absolute; top: 10px; left: 12px; display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 2px; }
 .lang button { border: 0; background: none; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 4px 9px; border-radius: 999px; cursor: pointer; }
 .lang button.on { background: var(--accent); color: var(--accent-text); }
-.intro { display: flex; flex-direction: column; gap: 14px; text-align: center; padding-top: 44px; }
+.intro { display: flex; flex-direction: column; gap: 14px; text-align: center; padding-top: 44px;
+  background: radial-gradient(ellipse at 50% -10%, color-mix(in srgb, var(--rim) 22%, transparent), transparent 55%), var(--bg); }
+.intro h2.marquee { font-size: 48px; letter-spacing: .1em; margin: 2px 0 -6px; }
+.bulbs { display: flex; justify-content: center; gap: 10px; }
+.bulbs i { width: 7px; height: 7px; border-radius: 50%; background: var(--rim); box-shadow: 0 0 8px var(--rim), 0 0 2px #fff inset; animation: twinkle 1s ease-in-out infinite; }
+@keyframes twinkle { 50% { opacity: .35; box-shadow: 0 0 2px var(--rim); } }
+.suits { display: flex; justify-content: center; gap: 14px; color: var(--rim); font-size: 16px; letter-spacing: .1em; margin-top: -4px; }
+.suits span:nth-child(2), .suits span:nth-child(3) { color: #e0455a; }
+.btn.play { position: relative; overflow: hidden; font-family: "Bebas Neue", Impact, "Arial Narrow Bold", sans-serif; font-size: 24px; letter-spacing: .1em; padding: 12px 18px 10px;
+  border: 2px solid var(--rim); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rim) 25%, transparent), 0 10px 24px rgba(0,0,0,.35); animation: pulse 2.2s ease-in-out infinite; }
+.btn.play::after { content: ""; position: absolute; top: -40%; left: -60%; width: 40%; height: 180%; transform: rotate(20deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent); animation: shine 2.8s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--rim) 12%, transparent), 0 10px 24px rgba(0,0,0,.35); } }
 .intro-img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 12px; }
 .intro-desc { color: var(--muted); font-size: 15px; line-height: 1.5; }
 .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; text-align: left; }
 .steps li { display: flex; gap: 10px; align-items: flex-start; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
-.steps li span { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-text); font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.steps li span { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--rim); color: var(--rim-text); border: 2px dashed rgba(255,255,255,.85); box-sizing: border-box; box-shadow: 0 2px 4px rgba(0,0,0,.4); font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
 .modal > .screen:first-of-type, .modal > .picker { margin-top: 18px; }
 
 /* result celebration */
@@ -102,4 +119,4 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 22px; f
 .congrats { font-size: 28px; animation: pop .5s cubic-bezier(.2,1.6,.4,1) both; }
 .won { margin-top: -6px; }
 @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .congrats { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .congrats, .bulbs i, .btn.play, .btn.play::after, .trigger::after { animation: none; } }
