@@ -23,6 +23,14 @@ render.yaml      Render Blueprint
 - The code is shown on screen and emailed through Resend (from-address is set per game).
 - Dashboard → Players: plays, unique emails, tally per reward, emails per reward, CSV export.
 
+## Dashboard
+- **Overview** — KPI tiles with change vs the previous period (plays, unique/new/returning players, plays per player,
+  email delivery), plays over time against the previous period, insights, new vs returning players, a weekday × hour
+  heatmap (ET), rewards won vs the probability you set (flags only gaps beyond chance), breakdowns by group/store/game,
+  language split and latest plays. Every chart has a table view. Each game's **Stats** tab shows the same, scoped to it.
+- **Players** — searchable directory with history per email; **Email delivery** — failures with Resend's reason and a resend button.
+- One filter row scopes everything: date range (ET presets or custom), store group, store, game. CSV exports follow it.
+
 ## Visitor flow
 1. Visitor passes the theme's age verification.
 2. On the **homepage only**, a "Play to Win" popup appears right away (once per visit). Copy, steps, buttons and an

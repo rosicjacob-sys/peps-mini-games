@@ -1,21 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from './api.js';
+import Overview from './pages/Overview.jsx';
 import { GAME_TYPES, THEMES, SLOT_ICONS, INTRO_DEFAULTS, themeFor, t } from '@peps/shared';
 
-const TABS = ['Rewards', 'Players', 'Intro popup', 'Appearance', 'Texts & Email'];
+const TABS = ['Stats', 'Rewards', 'Intro popup', 'Appearance', 'Texts & Email'];
 const blankReward = () => ({ title: { en: '', fr: '' }, subtitle: { en: '', fr: '' }, code: '', probability: 0, active: true });
 
 export default function GameEditor({ id, back }) {
-  const [game, setGame] = useState(null); const [tab, setTab] = useState('Rewards');
+  const [game, setGame] = useState(null); const [tab, setTab] = useState('Stats');
   const load = () => api.game(id).then(setGame); useEffect(() => { load(); }, [id]);
+  const scope = useMemo(() => ({ game_id: id, group_id: '', store_id: '' }), [id]);
   if (!game) return <p>Loading…</p>;
   return (
     <>
-      <button className="link" onClick={back}>← All games</button>
-      <h1>{game.name} <span className="muted">· {game.store_name} · {GAME_TYPES[game.type]?.label}</span></h1>
+      <button className="link back" onClick={back}>← All games</button>
+      <div className="page-head"><div><h1>{game.name}</h1><p className="muted">{GAME_TYPES[game.type]?.label} · {game.store_name}{game.group_name ? ` · ${game.group_name}` : ''} · <span className={`pill ${game.status}`}>{game.status === 'active' ? 'Live' : 'Paused'}</span></p></div></div>
       <div className="tabs">{TABS.map((x) => <button key={x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{x}</button>)}</div>
       {tab === 'Rewards' && <Rewards game={game} reload={load} />}
-      {tab === 'Players' && <Players game={game} />}
+      {tab === 'Stats' && <Overview scope={scope} />}
       {tab === 'Intro popup' && <Settings game={game} reload={load} section="intro" />}
       {tab === 'Appearance' && <Settings game={game} reload={load} section="appearance" />}
       {tab === 'Texts & Email' && <Settings game={game} reload={load} section="texts" back={back} />}
@@ -76,51 +78,6 @@ function Rewards({ game, reload }) {
         <button className="primary" disabled={!ok && rows.some((r) => r.active)} onClick={save}>Save rewards</button>
         <span className="good">{msg}</span><span className="error">{err}</span>
       </div>
-    </>
-  );
-}
-
-function Players({ game }) {
-  const [stats, setStats] = useState(null); const [filter, setFilter] = useState(null); const [plays, setPlays] = useState([]);
-  useEffect(() => { api.stats(game.id).then(setStats); }, [game.id]);
-  useEffect(() => { api.plays(game.id, filter?.id).then(setPlays); }, [game.id, filter]);
-  if (!stats) return <p>Loading…</p>;
-  const max = Math.max(1, ...stats.tally.map((x) => x.won));
-  return (
-    <>
-      <div className="stats">
-        <div className="card stat"><b>{stats.plays}</b><span>Total plays</span></div>
-        <div className="card stat"><b>{stats.players}</b><span>Unique emails</span></div>
-        <div className="card stat"><b>{stats.plays_7d}</b><span>Plays, last 7 days</span></div>
-        <div className="card stat"><b className={stats.email_failed ? 'bad' : ''}>{stats.email_failed}</b><span>Emails not delivered</span></div>
-      </div>
-      <h3>Rewards won</h3>
-      <table className="card">
-        <thead><tr><th>Reward</th><th>Code</th><th className="num">Won</th><th></th><th></th></tr></thead>
-        <tbody>
-          {stats.tally.map((r) => (
-            <tr key={r.reward_id || r.code} className={filter?.id === r.reward_id ? 'sel' : ''}>
-              <td>{t(r.title, 'en')}</td><td><code>{r.code}</code></td>
-              <td className="num">{r.won}</td><td className="barcell"><div className="bar" style={{ width: `${(r.won / max) * 100}%` }} /></td>
-              <td className="num"><button className="link" onClick={() => setFilter(filter?.id === r.reward_id ? null : { id: r.reward_id, title: t(r.title, 'en') })}>{filter?.id === r.reward_id ? 'Show all' : 'Show emails'}</button></td>
-            </tr>
-          ))}
-          {!stats.tally.length && <tr><td colSpan="5" className="muted">No plays yet.</td></tr>}
-        </tbody>
-      </table>
-      <div className="row between"><h3>{filter ? `Emails — ${filter.title}` : 'Recent plays'}</h3>
-        <button className="primary" onClick={() => api.download(game.id, filter?.id)}>Export CSV{filter ? ` (${filter.title})` : ''}</button></div>
-      <table className="card">
-        <thead><tr><th>Email</th><th>Reward</th><th>Code</th><th>Played (ET)</th><th>Email</th></tr></thead>
-        <tbody>
-          {plays.map((p) => (
-            <tr key={p.id + p.code}><td>{p.email}</td><td>{t(p.title, 'en')}</td><td><code>{p.code}</code></td>
-              <td>{new Date(p.created_at).toLocaleString('en-CA', { timeZone: 'America/Toronto' })}</td>
-              <td><span className={`pill ${p.email_status}`}>{p.email_status}</span></td></tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="muted">Showing up to 100 most recent. The CSV contains everything.</p>
     </>
   );
 }

@@ -20,6 +20,7 @@ adminRouter.use((req, res, next) => {
 });
 
 import { resolveSender } from './email.js';
+import { registerReports } from './reports.js';
 
 const wrap = (fn) => (req, res, next) => fn(req, res, next).catch(next);
 const loc = (v, max = 300) => ({ en: String(v?.en ?? '').slice(0, max), fr: String(v?.fr ?? '').slice(0, max) });
@@ -189,6 +190,8 @@ adminRouter.get('/games/:id/export.csv', wrap(async (req, res) => {
   const body = rows.map((r) => [r.email, r.store_group, r.store, r.game, r.title?.en, r.code, r.locale, r.created_at.toISOString()].map(csvCell).join(','));
   res.type('text/csv').set('Content-Disposition', 'attachment; filename="players.csv"').send([head, ...body].join('\n'));
 }));
+
+registerReports(adminRouter, wrap, csvCell);
 
 adminRouter.use((err, _req, res, _next) => {
   console.error(err);
