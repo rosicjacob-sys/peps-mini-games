@@ -40,8 +40,10 @@ function initialLocale(raw) {
 // The intro only shows on the homepage (/, or a language/market root like /fr, /en-ca).
 const isHome = () => /^\/(?:[a-z]{2}(?:-[a-z]{2})?)?\/?$/i.test(location.pathname);
 
-const playedUntil = (gameId) => store_(() => localStorage.getItem(`pg_played_${gameId}`));
-const playedThisWeek = (gameId) => { const v = playedUntil(gameId); return !!v && Date.now() < new Date(v).getTime(); };
+// this browser played one of the store's games this week (one play per email per week, across all games)
+const PLAYED = (storeKey) => `pg_played_${storeKey}`;
+const playedThisWeek = (storeKey) => { const v = store_(() => localStorage.getItem(PLAYED(storeKey))); return !!v && Date.now() < new Date(v).getTime(); };
+const markPlayed = (storeKey, until) => store_(() => until && localStorage.setItem(PLAYED(storeKey), until));
 
 function gateBlocking(sel) {
   let els = [];
@@ -107,7 +109,7 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
     if (!current) return;
     if (current.texts?.intro?.enabled === false) return;
     if (introPages !== 'all' && !isHome()) return;
-    if (store_(() => sessionStorage.getItem('pg_intro_done')) || playedThisWeek(current.id)) return;
+    if (store_(() => sessionStorage.getItem('pg_intro_done')) || playedThisWeek(store)) return;
     return whenAgeGateClear(ageSelector || DEFAULT_GATE, () => setIntro(true));
   }, [current?.id]);
 
@@ -217,8 +219,12 @@ function Play({ game, api, store, locale, onClose, onBack }) {
         body: JSON.stringify({ key: store, gameId: game.id, email: email.trim(), locale }),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok) { setResult(data); if (!data.test) try { localStorage.setItem(`pg_played_${game.id}`, data.nextPlayAt || data.expiresAt); } catch {} }
-      else if (data.error === 'already_played') { try { localStorage.setItem(`pg_played_${game.id}`, data.nextPlayAt); } catch {} setError(`${ui.already} ${ui.comeBack} ${new Date(data.nextPlayAt).toLocaleDateString(locale === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}.`); }
+      if (res.ok) { setResult(data); if (!data.test) markPlayed(store, data.nextPlayAt || data.expiresAt); }
+      else if (data.error === 'already_played') {
+        markPlayed(store, data.nextPlayAt);
+        const when = data.nextPlayText || new Date(data.nextPlayAt).toLocaleDateString(locale === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
+        setError(`${ui.already} ${data.email || email.trim()}. ${ui.onePer} ${ui.comeBack} ${when}.`);
+      }
       else if (data.error === 'invalid_email') setError(ui.invalidEmail);
       else setError(ui.error);
     } catch { setError(ui.error); }

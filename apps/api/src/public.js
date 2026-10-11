@@ -72,11 +72,18 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
   let playId;
   try {
     await client.query('BEGIN');
+    // one play per email per week across all of this store's games (another email can play again).
+    // The lock makes two simultaneous plays with the same email wait for each other.
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${store.id}|${mail.norm}|${weekKey}`]);
+    const { rowCount: playedHere } = await client.query(
+      'SELECT 1 FROM plays p JOIN games g ON g.id = p.game_id WHERE g.store_id = $1 AND p.email_norm = $2 AND p.week_key = $3 LIMIT 1',
+      [store.id, mail.norm, weekKey]);
+    if (playedHere) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'already_played', email: mail.email, nextPlayAt: week.nextPlayAt, nextPlayText: formatDate(week.nextPlayAt, locale) }); }
     const ins = await client.query(
       `INSERT INTO plays (game_id, email, email_norm, week_key, locale, ip_hash, is_test, email_status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (game_id, email_norm, week_key) DO NOTHING RETURNING id`,
       [game.id, mail.email, mail.norm, weekKey, locale, hashIp(req.ip), test, lost ? 'skipped' : 'pending']);
-    if (!ins.rowCount) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'already_played', nextPlayAt: week.nextPlayAt }); }
+    if (!ins.rowCount) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'already_played', email: mail.email, nextPlayAt: week.nextPlayAt, nextPlayText: formatDate(week.nextPlayAt, locale) }); }
     playId = ins.rows[0].id;
     for (const r of picks) {
       await client.query('INSERT INTO play_rewards (play_id, game_id, reward_id, title, subtitle, code) VALUES ($1,$2,$3,$4,$5,$6)',
