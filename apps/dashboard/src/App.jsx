@@ -144,38 +144,97 @@ function Games({ open }) {
 }
 
 function Stores() {
-  const [stores, setStores] = useState([]); const [groups, setGroups] = useState([]); const [name, setName] = useState('');
-  const load = () => { api.stores().then(setStores); api.groups().then(setGroups); }; useEffect(() => { load(); }, []);
+  const f = useFilters();
+  const [stores, setStores] = useState(null); const [groups, setGroups] = useState([]);
+  const [adding, setAdding] = useState(false);
+  const load = () => { api.stores().then(setStores); api.groups().then(setGroups); f.reloadLists(); };
+  useEffect(() => { load(); }, []);
   return (
     <>
-      <PageHead title="Stores" sub="Each store gets a script snippet for its theme and belongs to a store group." />
-      <form className="card row" onSubmit={async (e) => { e.preventDefault(); if (!name.trim()) return; await api.createStore({ name, allowed_origins: [] }); setName(''); load(); }}>
-        <label>Store name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Lexar Canada" /></label><button className="primary">+ Add store</button>
-      </form>
-      {stores.map((s) => <StoreCard key={s.id} s={s} groups={groups} reload={load} />)}
+      <PageHead title="Stores" sub="Your Shopify stores. Install each one once, then manage its games from Games."
+        actions={!adding && <button className="primary" onClick={() => setAdding(true)}>+ Add store</button>} />
+      {adding && <StoreForm groups={groups} onCancel={() => setAdding(false)} onSaved={() => { setAdding(false); load(); }} />}
+      <div className="store-list">
+        {stores?.map((s) => <StoreCard key={s.id} s={s} groups={groups} reload={load} />)}
+        {stores && !stores.length && !adding && (
+          <div className="card empty-state"><b>No stores yet</b><p className="muted">Add your first store to get its install code.</p>
+            <button className="primary" onClick={() => setAdding(true)}>+ Add store</button></div>
+        )}
+      </div>
     </>
   );
 }
 
-function StoreCard({ s, groups, reload }) {
-  const [name, setName] = useState(s.name); const [origins, setOrigins] = useState(s.allowed_origins.join('\n')); const [groupId, setGroupId] = useState(s.group_id || ''); const [msg, setMsg] = useState('');
-  const snippet = `<script src="${WIDGET_URL}" data-store="${s.public_key}" data-locale="{{ request.locale.iso_code }}" charset="utf-8" defer></script>`;
+// Add / edit a store. "Allowed origins" is shown as the store's website address(es).
+function StoreForm({ s, groups, onCancel, onSaved, onDelete }) {
+  const [name, setName] = useState(s?.name || ''); const [groupId, setGroupId] = useState(s?.group_id || '');
+  const [sites, setSites] = useState((s?.allowed_origins || []).join('\n')); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+  async function save(e) {
+    e.preventDefault(); if (!name.trim()) return setErr('Give the store a name.');
+    const list = sites.split(/[\n,\s]+/).map((x) => x.trim()).filter(Boolean).map((x) => (/^https?:\/\//.test(x) ? x : `https://${x}`).replace(/\/+$/, ''));
+    setBusy(true); setErr('');
+    try { const body = { name: name.trim(), group_id: groupId || null, allowed_origins: list }; s ? await api.updateStore(s.id, body) : await api.createStore(body); onSaved(); }
+    catch (e2) { setErr(e2.message); } finally { setBusy(false); }
+  }
   return (
-    <div className="card">
-      <div className="row">
-        <label className="grow">Name<input value={name} onChange={(e) => setName(e.target.value)} /></label>
-        <label>Store group<select value={groupId} onChange={(e) => setGroupId(e.target.value)}><option value="">— none —</option>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
+    <form className="card store-form" onSubmit={save}>
+      {!s && <h2>New store</h2>}
+      <div className="form-grid">
+        <label>Store name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Lexar Canada" autoFocus={!s} /></label>
+        <label>Store group<select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+          <option value="">No group</option>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
+          <span className="help">Code emails use the group's sender address. <a href="#/groups">Manage groups</a></span></label>
+        <label className="span-2"><span>Store website <span className="optional">optional</span></span>
+          <textarea rows="2" value={sites} onChange={(e) => setSites(e.target.value)} placeholder="https://lexarcanada.ca" />
+          <span className="help">Only these addresses can load the games — stops other sites copying your install code. Add one per line (include the www. version if your store uses it). Leave empty while testing.</span></label>
       </div>
-      <label>Allowed origins <span className="muted">(one per line, e.g. https://lexarcanada.ca — leave empty to allow any)</span>
-        <textarea rows="2" value={origins} onChange={(e) => setOrigins(e.target.value)} /></label>
-      <div className="row">
-        <button className="primary" onClick={async () => { await api.updateStore(s.id, { name, allowed_origins: origins.split('\n'), group_id: groupId || null }); setMsg('Saved'); reload(); }}>Save</button>
-        <button className="danger" onClick={async () => { if (confirm(`Delete ${s.name} and all its games, rewards and players?`)) { await api.deleteStore(s.id); reload(); } }}>Delete</button>
-        <span className="muted">{msg}</span>
+      {err && <p className="error">{err}</p>}
+      <div className="form-actions">
+        <button className="primary" disabled={busy}>{s ? 'Save changes' : 'Create store'}</button>
+        <button type="button" className="ghost" onClick={onCancel}>Cancel</button>
+        {onDelete && <button type="button" className="danger push" onClick={onDelete}>Delete store…</button>}
       </div>
-      <p className="muted">Paste in <code>theme.liquid</code> just before <code>&lt;/body&gt;</code>:</p>
-      <pre onClick={(e) => navigator.clipboard?.writeText(snippet)} title="Click to copy">{snippet}</pre>
-    </div>
+    </form>
+  );
+}
+
+function StoreCard({ s, groups, reload }) {
+  const [mode, setMode] = useState(null); // null | 'edit' | 'install'
+  const [copied, setCopied] = useState(false);
+  const snippet = `<script src="${WIDGET_URL}" data-store="${s.public_key}" data-locale="{{ request.locale.iso_code }}" charset="utf-8" defer></script>`;
+  const copy = () => navigator.clipboard?.writeText(snippet).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  const del = async () => { if (confirm(`Delete "${s.name}"? Its ${s.game_count} game(s), rewards and play history will be removed. This cannot be undone.`)) { await api.deleteStore(s.id); reload(); } };
+  return (
+    <article className="card store-card">
+      <div className="store-head">
+        <div className="store-id">
+          <span className="store-avatar" aria-hidden="true">{s.name.slice(0, 1).toUpperCase()}</span>
+          <div>
+            <h2>{s.name}</h2>
+            <div className="store-meta">
+              {s.group_name ? <span className="pill">{s.group_name}</span> : <span className="pill">No group</span>}
+              <span>{s.game_count} game{s.game_count === 1 ? '' : 's'}</span>
+              <span className="muted">{s.allowed_origins.length ? s.allowed_origins.join(', ') : 'Any website (not locked)'}</span>
+            </div>
+          </div>
+        </div>
+        <div className="store-actions">
+          <button className={mode === 'install' ? 'primary' : ''} onClick={() => setMode(mode === 'install' ? null : 'install')}>Install on Shopify</button>
+          <button className="ghost" onClick={() => setMode(mode === 'edit' ? null : 'edit')}>{mode === 'edit' ? 'Close' : 'Edit'}</button>
+        </div>
+      </div>
+      {mode === 'install' && (
+        <div className="install">
+          <ol className="steps-list">
+            <li><b>Copy the install code</b>
+              <div className="snippet"><code>{snippet}</code><button className="primary small" onClick={copy}>{copied ? 'Copied ✓' : 'Copy'}</button></div></li>
+            <li><b>Open the theme code in Shopify</b><span className="muted">Online Store → Themes → ⋯ (next to your theme) → Edit code</span></li>
+            <li><b>Paste it into <code>layout/theme.liquid</code></b><span className="muted">just above the closing <code>&lt;/body&gt;</code> tag, then Save. Do this once — game changes made here go live automatically.</span></li>
+          </ol>
+        </div>
+      )}
+      {mode === 'edit' && <StoreForm s={s} groups={groups} onCancel={() => setMode(null)} onSaved={() => { setMode(null); reload(); }} onDelete={del} />}
+    </article>
   );
 }
 

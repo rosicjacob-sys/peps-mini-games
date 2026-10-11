@@ -3,6 +3,8 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { pickLocale, GAME_TYPES } from '@peps/shared';
 import { buildScript } from '@peps/shared/blackjack.js';
+import { buildLucky9, buildBaccarat, buildPokerHand, pokerTiers, colorDice } from '@peps/shared/cards.js';
+import { singleReward } from '@peps/shared';
 import { q, pool } from './db.js';
 import { weekInfo, normalizeEmail, pickRewards, hashIp, formatExpiry, secureRandom, isTestEmail } from './lib.js';
 import crypto from 'node:crypto';
@@ -21,12 +23,12 @@ async function storeByKey(key, origin) {
   return store;
 }
 
-const publicGame = (g, rewards) => ({
+const publicGame = (g, rewards) => { const tiers = g.type === 'poker' ? pokerTiers(rewards) : null; return {
   id: g.id, type: g.type, name: g.name, theme: g.theme, brandAccent: g.brand_accent,
   rewardsPerPlay: g.rewards_per_play, texts: g.texts,
   // titles only — never codes or probabilities
-  rewards: rewards.map((r) => ({ id: r.id, title: r.title, subtitle: r.subtitle, symbol: r.symbol })),
-});
+  rewards: rewards.map((r) => ({ id: r.id, title: r.title, subtitle: r.subtitle, symbol: r.symbol, ...(tiers ? { hand: tiers[r.id] } : {}) })),
+}; };
 
 // Active games for a store.
 publicRouter.get('/config', async (req, res) => {
@@ -35,7 +37,7 @@ publicRouter.get('/config', async (req, res) => {
   const { rows: games } = await q("SELECT * FROM games WHERE store_id = $1 AND status = 'active' ORDER BY created_at", [store.id]);
   const out = [];
   for (const g of games) {
-    const { rows: rewards } = await q('SELECT id, title, subtitle, symbol FROM rewards WHERE game_id = $1 AND active ORDER BY sort, id', [g.id]);
+    const { rows: rewards } = await q('SELECT id, title, subtitle, symbol, probability, sort FROM rewards WHERE game_id = $1 AND active ORDER BY sort, id', [g.id]);
     if (rewards.length) out.push(publicGame(g, rewards));
   }
   res.set('Cache-Control', 'public, max-age=60').json({ games: out });
@@ -55,8 +57,8 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
     WHERE g.id = $1 AND g.store_id = $2 AND g.status = 'active'`, [gameId, store.id]);
   if (!game || !GAME_TYPES[game.type]) return res.status(404).json({ error: 'game_unavailable' });
   const { rows: rewards } = await q('SELECT * FROM rewards WHERE game_id = $1 AND active ORDER BY sort, id', [game.id]);
-  // blackjack (one hand) and slots (one payline) always award exactly one reward
-  const picks = pickRewards(rewards, ['blackjack', 'slots'].includes(game.type) ? 1 : game.rewards_per_play);
+  // every game except the wheel shows one outcome, so it awards exactly one reward
+  const picks = pickRewards(rewards, singleReward(game.type) ? 1 : game.rewards_per_play);
   if (!picks.length) return res.status(409).json({ error: 'game_unavailable' });
 
   const week = weekInfo();
@@ -96,6 +98,12 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
     // blackjack: the hand is a warm-up the player always wins (a natural 21 one time in five); the wheel
     // that follows decides the reward, so the reward odds are the only thing that matters
     ...(game.type === 'blackjack' ? { script: buildScript(secureRandom() < 0.2 ? 'blackjack' : 'win', secureRandom) } : {}),
+    ...(game.type === 'lucky9' ? { script: buildLucky9(secureRandom) } : {}),
+    ...(game.type === 'baccarat' ? { script: buildBaccarat(secureRandom) } : {}),
+    // poker: the hand shown is the one the paytable maps to the reward won
+    ...(game.type === 'poker' ? { script: { hand: pokerTiers(rewards)[picks[0].id], cards: buildPokerHand(pokerTiers(rewards)[picks[0].id], secureRandom) } } : {}),
+    // color game: dice for the winning reward's colour (its position on the board)
+    ...(game.type === 'color' ? { script: { dice: colorDice(rewards.findIndex((r) => r.id === picks[0].id), rewards.length, secureRandom) } } : {}),
     expiresAt: week.expiresAt,
     expiresText: formatExpiry(week.expiresAt, locale),
   });

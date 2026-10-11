@@ -3,10 +3,14 @@ import { UI, INTRO_DEFAULTS, LOCALES, pickLocale, t, themeFor, GAME_TYPES } from
 import Wheel from './games/Wheel.jsx';
 import Blackjack from './games/Blackjack.jsx';
 import Slots from './games/Slots.jsx';
+import ColorGame from './games/ColorGame.jsx';
+import Lucky9 from './games/Lucky9.jsx';
+import Baccarat from './games/Baccarat.jsx';
+import Poker from './games/Poker.jsx';
 import Confetti from './Confetti.jsx';
 
 // Stages a play goes through before the result screen. Blackjack is a warm-up hand, then the wheel decides the reward.
-const GAMES = { wheel: [Wheel], blackjack: [Blackjack, Wheel], slots: [Slots] };
+const GAMES = { wheel: [Wheel], blackjack: [Blackjack, Wheel], slots: [Slots], color: [ColorGame], lucky9: [Lucky9, Wheel], baccarat: [Baccarat, Wheel], poker: [Poker] };
 
 function cssVars(game) {
   const th = themeFor(game.type, game.theme);
@@ -91,6 +95,8 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
   }, [store, api, gameType]);
 
   const current = game || games?.[0];
+  // closing forgets the chosen game when the store has several, so "Play & Win" opens the picker again
+  const close = () => { setOpen(false); if (games?.length > 1) setGame(null); };
 
   // Intro popup: homepage only, every visit (once per browser session), straight after age verification.
   useEffect(() => {
@@ -115,11 +121,11 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
       <button className="trigger" onClick={() => setOpen(true)}><span className="trigger-suit" aria-hidden="true">♠</span>{label}</button>
       {intro && !open && <Intro game={current} locale={locale} setLocale={setLocale} onPlay={() => finishIntro(true)} onDecline={() => finishIntro(false)} />}
       {open && (
-        <div className="overlay" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
+        <div className="overlay" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && close()}>
           <div className="modal">
             <LangToggle locale={locale} setLocale={setLocale} />
-            <button className="close" aria-label={ui.close} onClick={() => setOpen(false)}>×</button>
-            {game ? <Play key={game.id} game={game} api={api} store={store} locale={locale} onClose={() => setOpen(false)} /> : (
+            <button className="close" aria-label={ui.close} onClick={close}>×</button>
+            {game ? <Play key={game.id} game={game} api={api} store={store} locale={locale} onClose={close} onBack={games.length > 1 ? () => setGame(null) : null} /> : (
               <div className="picker">
                 <Bulbs />
                 <h2 className="marquee">{ui.choose}</h2>
@@ -167,7 +173,7 @@ function Intro({ game, locale, setLocale, onPlay, onDecline }) {
   );
 }
 
-function Play({ game, api, store, locale, onClose }) {
+function Play({ game, api, store, locale, onClose, onBack }) {
   const ui = UI[locale];
   const stages = GAMES[game.type];
   const [stage, setStage] = useState(0);
@@ -202,6 +208,7 @@ function Play({ game, api, store, locale, onClose }) {
   if (!result) {
     return (
       <form className="screen gate" onSubmit={submit}>
+        {onBack && <button type="button" className="back-link" onClick={onBack}>← {ui.otherGames}</button>}
         <Bulbs />
         <h2 className="marquee">{heading}</h2>
         <div className="suits" aria-hidden="true"><span>♠</span><span>♥</span><span>♦</span><span>♣</span></div>

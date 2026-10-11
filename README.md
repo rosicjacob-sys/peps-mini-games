@@ -80,4 +80,8 @@ npm run dev:widget     # :5174  → /?store=<public_key>&api=http://localhost:30
 ## Roadmap
 - [x] API, dashboard, wheel, EN/FR, weekly limit, Resend, CSV export
 - [x] Slot machine (one payline; all three reels stop on the winning reward's symbol)
+- [x] Color Game (each reward sits on one of six colours; two or three dice of a colour win it; max 6 rewards)
+- [x] Lucky 9 (draw or stand, closest to 9; the player wins, then spins the wheel for the reward)
+- [x] Baccarat (bet Player / Banker / Tie, standard third-card rules; the bet wins, then the wheel decides the reward)
+- [x] Poker (5 cards, no draw; a paytable maps each reward to a hand — rarer reward, better hand)
 - [x] Blackjack (the player wins a warm-up hand with hit/stand, then spins the wheel that decides the reward; fixed purple theme)
