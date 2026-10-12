@@ -103,11 +103,11 @@ export function siteTheme(th, colors) {
   return { ...th, label: 'My website colours', grad: [main, second], onGrad, pops,
     rim: darkenTo(second, '#ffffff', 4.5), bg: mixHex(main, '#ffffff', 0.94), border: mixHex(main, '#ffffff', 0.8), text: ink, muted: '#5b5670' };
 }
-// the theme a game actually shows: its palette, or its website colours when an arcade game is set to match them
-export function gameTheme(game) {
+// the theme a game shows on a store: its palette, or, for an arcade game set to "Match my website", the colours of
+// that store's website (`site` = the store's {main, second}); a store without colours keeps the palette
+export function gameTheme(game, site) {
   const th = themeFor(game.type, game.theme);
-  const c = game.texts?.colors;
-  return categoryOf(game.type) === 'arcade' && c?.mode === 'site' && isHex(c.main) ? siteTheme(th, c) : th;
+  return categoryOf(game.type) === 'arcade' && game.texts?.colors?.mode === 'site' && isHex(site?.main) ? siteTheme(th, site) : th;
 }
 
 export function themeFor(type, themeKey) {

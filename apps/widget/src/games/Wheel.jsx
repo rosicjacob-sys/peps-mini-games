@@ -35,7 +35,7 @@ function layoutLabel(text, maxLines) {
 // With several rewards per play the player spins once per reward.
 export default function Wheel({ game, result, locale, onDone }) {
   const ui = UI[locale];
-  const th = gameTheme(game);
+  const th = gameTheme(game, game.site);
   // the arcade wheel (Lucky Spin): candy-bright slices with readable labels, white rim
   const arcade = categoryOf(game.type) === 'arcade';
   // a standalone wheel that can lose gets a "Try again" slice; a lost play spins once onto it

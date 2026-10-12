@@ -153,3 +153,6 @@ CREATE INDEX IF NOT EXISTS plays_store_week_idx ON plays(store_id, email_norm, w
 -- one play per email per *store* per week is enforced in /play (under a lock); the old per-game rule would wrongly
 -- block the same game on a second store of the group
 ALTER TABLE plays DROP CONSTRAINT IF EXISTS plays_game_id_email_norm_week_key_key;
+
+-- each store's brand colours (read from its website, or set by hand), used by arcade games set to "Match my website"
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS colors jsonb NOT NULL DEFAULT '{}';

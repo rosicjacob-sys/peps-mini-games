@@ -20,6 +20,7 @@ adminRouter.use((req, res, next) => {
 });
 
 import { resolveSender } from './email.js';
+import { detectStoreColors } from './colors.js';
 import { registerReports } from './reports.js';
 
 const wrap = (fn) => (req, res, next) => fn(req, res, next).catch(next);
@@ -81,13 +82,63 @@ adminRouter.post('/stores', wrap(async (req, res) => {
   const origins = (req.body.allowed_origins || []).map((o) => String(o).trim().replace(/\/$/, '')).filter(Boolean);
   const taken = await originsTaken(origins); if (taken) return res.status(400).json({ error: taken });
   const { rows } = await q('INSERT INTO stores (name, allowed_origins, group_id, site_url) VALUES ($1,$2,$3,$4) RETURNING *', [String(req.body.name || '').trim() || 'Untitled store', origins, req.body.group_id || null, siteUrl(req.body.site_url)]);
+  detectStoreColors(rows[0].id).catch(() => {});   // read its brand colours in the background
   res.status(201).json(rows[0]);
 }));
 adminRouter.put('/stores/:id', wrap(async (req, res) => {
   const origins = (req.body.allowed_origins || []).map((o) => String(o).trim().replace(/\/$/, '')).filter(Boolean);
   const taken = await originsTaken(origins, req.params.id); if (taken) return res.status(400).json({ error: taken });
-  const { rows } = await q('UPDATE stores SET name = $2, allowed_origins = $3, group_id = $4, site_url = $5 WHERE id = $1 RETURNING *', [req.params.id, String(req.body.name || '').trim(), origins, req.body.group_id || null, siteUrl(req.body.site_url)]);
-  rows[0] ? res.json(rows[0]) : res.sendStatus(404);
+  const { rows: [before] } = await q('SELECT * FROM stores WHERE id = $1', [req.params.id]);
+  if (!before) return res.sendStatus(404);
+  // brand colours: picked by hand ({mode:'manual', main, second}) or automatic ({mode:'auto'}: detected again)
+  const c = req.body.colors; let colors = before.colors || {};
+  if (c?.mode === 'manual' && isHex(c.main)) colors = { ...colors, mode: 'manual', main: c.main.toLowerCase(), second: isHex(c.second) ? c.second.toLowerCase() : '' };
+  if (c?.mode === 'auto' && colors.mode === 'manual') colors = { mode: 'auto' };
+  const { rows } = await q('UPDATE stores SET name = $2, allowed_origins = $3, group_id = $4, site_url = $5, colors = $6 WHERE id = $1 RETURNING *', [req.params.id, String(req.body.name || '').trim(), origins, req.body.group_id || null, siteUrl(req.body.site_url), colors]);
+  // a new website (or going back to automatic) re-reads the colours
+  const siteChanged = (before.site_url || '') !== (rows[0].site_url || '') || before.allowed_origins.join() !== rows[0].allowed_origins.join();
+  if (colors.mode !== 'manual' && (siteChanged || !colors.main)) detectStoreColors(rows[0].id).catch(() => {});
+  res.json(rows[0]);
+}));
+// "Check install": load the store's website like a visitor and report what stops the games from showing
+const WIDGET_MARK = 'pg-groups-v1';   // set by widget builds that support the shared (keyless) install line
+adminRouter.get('/stores/:id/check', wrap(async (req, res) => {
+  const { rows: [s] } = await q(`SELECT s.*, (SELECT count(*)::int FROM games g WHERE g.group_id = s.group_id AND g.status = 'active') AS live
+    FROM stores s WHERE s.id = $1`, [req.params.id]);
+  if (!s) return res.sendStatus(404);
+  const checks = []; const add = (ok, label, fix) => { checks.push({ ok: !!ok, label, fix: ok ? null : fix }); return ok; };
+  const done = (extra = {}) => res.json({ ok: checks.every((c) => c.ok), checks, ...extra });
+  add(s.group_id, 'The store is in a store group', 'Edit the store and pick its group: a store shows its group\'s games.');
+  add(s.live > 0, `Its group has live games (${s.live})`, 'Add games to the group on the Games page, or switch them to Live.');
+  const url = s.site_url || s.allowed_origins[0];
+  if (!add(url, 'A website is listed for the store', 'Edit the store and add its website address.')) return done();
+  let html = '', finalUrl = url;
+  try {
+    const r = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'Mozilla/5.0 (peps-games install check)' } });
+    html = (await r.text()).slice(0, 3_000_000); finalUrl = r.url || url;
+  } catch (e) { add(false, `The website opens (${url})`, `It could not be opened: ${e.name === 'TimeoutError' ? 'timed out' : e.message}.`); return done(); }
+  const origin = new URL(finalUrl).origin;
+  const locked = /\/password(\b|$)/.test(new URL(finalUrl).pathname);
+  add(!locked, 'The storefront is open (not behind Shopify\'s password page)', 'The site redirects to its password page, so visitors (and this check) cannot see the theme. Remove the storefront password in Shopify (Online Store → Preferences) when you go live.');
+  if (locked) return done({ url: finalUrl });
+  const tags = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']*widget\.js[^"']*)["'][^>]*>/gi)].map((m) => ({ tag: m[0], src: new URL(m[1], finalUrl).toString(), key: m[0].match(/data-store=["']([^"']*)["']/i)?.[1] || '' }));
+  if (!add(tags.length, 'The install line is on the page', 'Paste the install line into layout/theme.liquid just above </body> and Save, in the theme that is live (Online Store → Themes → the current theme).')) return done({ url: finalUrl });
+  if (tags.length > 1) add(false, `The install line is on the page once (found ${tags.length})`, 'Remove the extra copies from theme.liquid.');
+  const t = tags[0];
+  if (t.key) add(t.key === s.public_key, 'The line\'s data-store key is this store\'s', 'The pasted line carries another store\'s key. Use the shared line (no key) from the Stores page.');
+  else add(s.allowed_origins.includes(origin), `The site's address (${origin}) is in the store's websites`, `Visitors land on ${origin}. Add exactly that address to the store's websites (Edit), including www. if it is used.`);
+  try {
+    const js = await (await fetch(t.src, { signal: AbortSignal.timeout(10000) })).text();
+    add(t.key || js.includes(WIDGET_MARK), 'The widget is the latest version', 'The widget service is an older build that needs the data-store key. Redeploy peps-games-widget on Render (Manual Deploy → Deploy latest commit), then wait a few minutes for the cache.');
+  } catch (e) { add(false, `The widget file loads (${t.src})`, `It could not be loaded: ${e.message}. Check the address in the install line.`); }
+  done({ url: finalUrl, script: t.tag });
+}));
+
+// read the store's colours from its website again (also replaces a manual choice)
+adminRouter.post('/stores/:id/detect-colors', wrap(async (req, res) => {
+  const r = await detectStoreColors(req.params.id, { force: true });
+  if (!r) return res.sendStatus(404);
+  r.error && !r.main ? res.status(400).json(r) : res.json(r);
 }));
 adminRouter.delete('/stores/:id', wrap(async (req, res) => { await q('DELETE FROM stores WHERE id = $1', [req.params.id]); res.sendStatus(204); }));
 
@@ -105,43 +156,14 @@ adminRouter.get('/games', wrap(async (req, res) => {
 adminRouter.get('/games/:id', wrap(async (req, res) => {
   const { rows: [g] } = await q(`SELECT g.*, sg.name AS group_name,
       sg.from_name AS group_from_name, sg.from_email AS group_from_email, sg.reply_to AS group_reply_to,
-      coalesce((SELECT array_agg(s.name ORDER BY s.created_at) FROM stores s WHERE s.group_id = g.group_id), '{}') AS store_names
+      coalesce((SELECT array_agg(s.name ORDER BY s.created_at) FROM stores s WHERE s.group_id = g.group_id), '{}') AS store_names,
+      coalesce((SELECT json_agg(json_build_object('id', s.id, 'name', s.name, 'colors', s.colors) ORDER BY s.created_at) FROM stores s WHERE s.group_id = g.group_id), '[]') AS stores
     FROM games g LEFT JOIN store_groups sg ON sg.id = g.group_id WHERE g.id = $1`, [req.params.id]);
   if (!g) return res.sendStatus(404);
   const { rows: rewards } = await q('SELECT * FROM rewards WHERE game_id = $1 ORDER BY sort, id', [g.id]);
   res.json({ ...g, rewards, effective_sender: resolveSender(g) });
 }));
 
-// "Detect from my website": read the homepage of a store in the game's group and suggest the colours its theme uses
-// most (theme-color meta, CSS colour variables, inline styles), leaving out greys, near-white and near-black.
-const toHex = (r, g, b) => `#${[r, g, b].map((v) => Math.max(0, Math.min(255, Number(v))).toString(16).padStart(2, '0')).join('')}`;
-function colourful(hex) {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
-  const sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
-  return sat > 0.25 && l > 0.12 && l < 0.88;
-}
-adminRouter.get('/games/:id/site-colors', wrap(async (req, res) => {
-  const { rows: [st] } = await q(`SELECT s.name, s.site_url, s.allowed_origins FROM games g JOIN stores s ON s.group_id = g.group_id
-    WHERE g.id = $1 AND (s.site_url IS NOT NULL OR cardinality(s.allowed_origins) > 0) ORDER BY s.created_at LIMIT 1`, [req.params.id]);
-  const url = st && (st.site_url || st.allowed_origins[0]);
-  if (!url) return res.status(400).json({ error: 'No store in this group has a website listed yet (Stores → Edit).' });
-  let html = '';
-  try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'Mozilla/5.0 (peps-games colour check)' }, redirect: 'follow' });
-    html = (await r.text()).slice(0, 3_000_000);
-  } catch (e) { return res.status(502).json({ error: `Could not open ${url} (${e.name === 'TimeoutError' ? 'timed out' : e.message}).` }); }
-  const counts = new Map(); const add = (hex, w = 1) => { hex = hex.toLowerCase(); if (colourful(hex)) counts.set(hex, (counts.get(hex) || 0) + w); };
-  const meta = html.match(/<meta[^>]+name=["']theme-color["'][^>]*content=["'](#[0-9a-f]{6})/i)?.[1];
-  if (meta) add(meta, 50);
-  // CSS colour variables count more than ordinary colours (they are the theme's settings)
-  for (const m of html.matchAll(/--[\w-]*colou?r[\w-]*\s*:\s*(#[0-9a-f]{6})\b/gi)) add(m[1], 5);
-  for (const m of html.matchAll(/--[\w-]*colou?r[\w-]*\s*:\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\b/gi)) add(toHex(m[1], m[2], m[3]), 5);
-  for (const m of html.matchAll(/#([0-9a-f]{6})\b/gi)) add(`#${m[1]}`);
-  for (const m of html.matchAll(/rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/gi)) add(toHex(m[1], m[2], m[3]));
-  const colors = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([hex]) => hex);
-  res.json({ url, store: st.name, colors });
-}));
 
 // sound settings: effects on/off; music built-in, off, or a custom https file
 const cleanSound = (s = {}) => {
@@ -162,8 +184,8 @@ function gameFields(b) {
     status: b.status === 'paused' ? 'paused' : 'active', theme, brand,
     per: singleReward(b.type) ? 1 : Math.min(5, Math.max(1, parseInt(b.rewards_per_play, 10) || 1)),
     texts: { heading: loc(tx.heading), subheading: loc(tx.subheading), privacy: loc(tx.privacy), triggerLabel: loc(tx.triggerLabel), privacyUrl: String(tx.privacyUrl || '').slice(0, 300), intro: cleanIntro(tx.intro), sound: cleanSound(tx.sound), reminder: { enabled: tx.reminder?.enabled !== false },
-      // arcade games: preset palette, or the website's own colours
-      colors: { mode: tx.colors?.mode === 'site' && isHex(tx.colors?.main) ? 'site' : 'theme', main: isHex(tx.colors?.main) ? tx.colors.main : '', second: isHex(tx.colors?.second) ? tx.colors.second : '' } },
+      // arcade games: a preset palette, or each store's own website colours (the palette is then the fallback)
+      colors: { mode: tx.colors?.mode === 'site' ? 'site' : 'theme' } },
     from_name: String(b.from_name || '').slice(0, 120), from_email: String(b.from_email || '').trim().slice(0, 254), reply_to: String(b.reply_to || '').trim().slice(0, 254),
     subject: loc(b.email_subject),
   };

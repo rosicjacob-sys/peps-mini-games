@@ -16,6 +16,11 @@ render.yaml      Render Blueprint
   **Games belong to a group**: every store in the group shows them, so adding a store needs no game setup (pick its
   group, list its website, paste the install line). A group also carries the default Resend sender (From name / email /
   reply-to) for its games; a game can override it. Plays, the weekly limit, reports and reminders stay per store.
+- **Arcade colours**: an arcade game uses a preset palette, or "Match my website": each store then shows it in its own
+  brand colours, read automatically from the store's homepage (on save, at startup, and on first widget load; editable
+  or re-detected per store on the Stores page). Stores without colours use the game's palette.
+- **Check install** (Stores): loads the store's site like a visitor and reports what stops the games from showing
+  (no install line, address not listed incl. www., wrong key, outdated widget build, password page, no live games).
 - **One install line for every store**: `<script src=".../widget.js" data-locale="{{ request.locale.iso_code }}" defer>`.
   The API finds the store from the page's website (the store's listed websites; each can belong to one store).
   `data-store="<key>"` still works and is needed only for a store with no website listed.

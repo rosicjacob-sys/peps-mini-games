@@ -20,7 +20,7 @@ const COPY = {
 // The weekly "play again" email, styled like the game they played (casino felt and gold, or arcade gradient).
 export function buildReminder({ game, locale, playUrl, unsubUrl }) {
   const c = COPY[locale] || COPY.en;
-  const th = gameTheme(game);
+  const th = gameTheme(game, game.store_colors);
   const arcade = categoryOf(game.type) === 'arcade';
   const subject = t(game.email_subject, locale) || c.subject;
   const store = game.store_name || '';

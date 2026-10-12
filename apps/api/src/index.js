@@ -4,6 +4,7 @@ import { migrate, q } from './db.js';
 import { publicRouter } from './public.js';
 import { adminRouter, linkCustomRewards, moveGamesToGroups } from './admin.js';
 import { scheduleReminders } from './reminders.js';
+import { detectMissingColors } from './colors.js';
 
 for (const k of ['DATABASE_URL', 'JWT_SECRET', 'DASHBOARD_PASSWORD']) {
   if (!process.env[k]) { console.error(`Missing env var ${k}`); process.exit(1); }
@@ -26,3 +27,5 @@ if (moved.linked) console.log(`Moved ${moved.linked} game reward(s) into the rew
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`API listening on :${port}`));
 scheduleReminders();
+// read brand colours for stores that have a website but no colours yet
+setTimeout(() => detectMissingColors().catch((e) => console.error('[colors]', e)), 5000);

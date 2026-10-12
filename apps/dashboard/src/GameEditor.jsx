@@ -146,35 +146,23 @@ function ReminderPreview({ gameId }) {
   );
 }
 
-// Arcade "Match my website": a main colour (and an optional second for the gradient), with colours read from the
-// store's homepage offered as one-click swatches.
-function SiteColors({ gameId, colors, onChange }) {
-  const [found, setFound] = useState(null); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
-  async function detect() {
-    setBusy(true); setErr('');
-    try { setFound(await api.siteColors(gameId)); } catch (e) { setErr(e.message); } finally { setBusy(false); }
-  }
+// Arcade "Match my website": every store in the group shows the game in its own website colours
+// (detected automatically from each store's homepage; changed on the Stores page).
+function StoreColours({ game, stores }) {
+  if (!stores?.length) return <p className="muted small">This group has no stores yet.</p>;
   return (
-    <div className="site-colors">
-      <p className="muted small">The banner, outlines and titles use your colours; text shades are adjusted automatically so everything stays readable.</p>
-      <div className="row">
-        <label>Main colour<input type="color" value={colors.main || '#7b3ff2'} onChange={(e) => onChange({ main: e.target.value })} /></label>
-        <label>Second colour <span className="muted">(gradient end)</span>
-          <span className="row tight"><input type="color" value={colors.second || colors.main || '#7b3ff2'} onChange={(e) => onChange({ second: e.target.value })} />
-            {colors.second ? <button className="link" onClick={() => onChange({ second: '' })}>Auto</button> : <span className="muted small">Auto (a darker shade)</span>}</span></label>
-        <button className="ghost" disabled={busy} onClick={detect}>{busy ? 'Reading your website…' : 'Detect from my website'}</button>
-      </div>
-      {err && <p className="error">{err}</p>}
-      {found && (found.colors.length ? (
-        <div className="found-colors">
-          <span className="muted small">Colours on {found.url}:</span>
-          {found.colors.map((c) => (
-            <span key={c} className="found-colour"><i style={{ background: c }} /><code>{c}</code>
-              <button className="ghost small" onClick={() => onChange({ main: c })}>Main</button>
-              <button className="ghost small" onClick={() => onChange({ second: c })}>2nd</button></span>
-          ))}
-        </div>
-      ) : <p className="muted small">No clear brand colours found on {found.url}. Pick them with the colour boxes above.</p>)}
+    <div className="store-colours">
+      {stores.map((s) => {
+        const c = s.colors || {}; const th = gameTheme(game, c);
+        const has = /^#[0-9a-f]{6}$/i.test(c.main || '');
+        return (
+          <div key={s.id} className="store-colour">
+            <span className="sc-band" style={{ background: `linear-gradient(135deg, ${th.grad[0]}, ${th.grad[1]})`, color: th.onGrad || '#fff' }}>{s.name}</span>
+            <span className="muted small">{has ? (c.mode === 'manual' ? 'Colours set by hand' : `Detected from ${c.from || 'its website'}`) : c.error ? `Could not read its website, using the palette below` : 'Not detected yet (add its website on Stores), using the palette below'}</span>
+          </div>
+        );
+      })}
+      <a className="small" href="#/stores">Change a store's colours on the Stores page</a>
     </div>
   );
 }
@@ -190,7 +178,7 @@ function Settings({ game, reload, section, back }) {
   }
   const th = gameTheme(g);
   const cat = categoryOf(g.type);
-  const colors = { mode: 'theme', main: '', second: '', ...g.texts.colors };
+  const colors = { mode: 'theme', ...g.texts.colors };
   const site = cat === 'arcade' && colors.mode === 'site';
   return (
     <div className="card form">
@@ -205,12 +193,13 @@ function Settings({ game, reload, section, back }) {
           {cat === 'arcade' && (
             <div className="segmented colour-mode" role="radiogroup" aria-label="Colours">
               <button role="radio" aria-checked={!site} className={!site ? 'on' : ''} onClick={() => setT('colors', { ...colors, mode: 'theme' })}>Arcade palette</button>
-              <button role="radio" aria-checked={site} className={site ? 'on' : ''} onClick={() => setT('colors', { ...colors, mode: 'site', main: colors.main || th.grad?.[0] || '#7b3ff2' })}>Match my website</button>
+              <button role="radio" aria-checked={site} className={site ? 'on' : ''} onClick={() => setT('colors', { ...colors, mode: 'site' })}>Match my website</button>
             </div>
           )}
-          {site && <SiteColors gameId={g.id} colors={colors} onChange={(c) => setT('colors', { ...colors, ...c })} />}
-          {fixed ? <p className="muted">Blackjack keeps its signature purple-and-gold theme.</p> : !site && (
+          {site && <><p className="muted small">Each store shows this game in its own website colours, read automatically from its homepage. Text shades are adjusted so everything stays readable.</p><StoreColours game={g} stores={game.stores} /></>}
+          {fixed ? <p className="muted">Blackjack keeps its signature purple-and-gold theme.</p> : (
             <>
+              {site && <p className="muted small fallback-label">Fallback palette, for stores whose colours aren't known yet:</p>}
               <div className="themes">
                 {Object.entries(THEMES).filter(([k, v]) => !v.locked && themeCategory(k) === cat).map(([k, v]) => (
                   <button key={k} className={`swatch ${themeFor(g.type, g.theme) === v ? 'on' : ''}`} onClick={() => setG({ ...g, theme: k })}
@@ -225,13 +214,6 @@ function Settings({ game, reload, section, back }) {
                 {g.brand_accent && <button className="link" onClick={() => setG({ ...g, brand_accent: null })}>Reset to neutral</button>}
               </div>
             </>
-          )}
-          {site && (
-            <div className="row">
-              <label>Button colour <span className="muted">(optional; the yellow default suits most sites)</span>
-                <input type="color" value={g.brand_accent || th.accent} onChange={(e) => setG({ ...g, brand_accent: e.target.value })} /></label>
-              {g.brand_accent && <button className="link" onClick={() => setG({ ...g, brand_accent: null })}>Reset</button>}
-            </div>
           )}
           <div className="preview" style={{ background: th.grad ? `linear-gradient(135deg, ${th.grad[0]}, ${th.grad[1]})` : th.bg, color: th.grad ? th.onGrad || '#fff' : th.text, borderColor: th.border }}>
             <b>Preview</b>

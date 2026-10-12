@@ -188,12 +188,20 @@ function StoreForm({ s, groups, onCancel, onSaved, onDelete }) {
   const [name, setName] = useState(s?.name || ''); const [groupId, setGroupId] = useState(s?.group_id || '');
   const [sites, setSites] = useState((s?.allowed_origins || []).join('\n')); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const [siteUrl, setSiteUrl] = useState(s?.site_url || '');
+  // brand colours: detected from the website (auto) or picked by hand (manual)
+  const [col, setCol] = useState({ mode: 'auto', main: '', second: '', ...(s?.colors || {}) }); const [detecting, setDetecting] = useState(false);
+  const pick = (k) => (e) => setCol({ ...col, mode: 'manual', [k]: e.target.value });
+  async function redetect() {
+    setDetecting(true); setErr('');
+    try { const r = await api.detectStoreColors(s.id); setCol({ mode: 'auto', main: '', second: '', ...r }); } catch (e2) { setErr(e2.message); } finally { setDetecting(false); }
+  }
   async function save(e) {
     e.preventDefault(); if (!name.trim()) return setErr('Give the store a name.');
     const list = sites.split(/[\n,\s]+/).map((x) => x.trim()).filter(Boolean).map((x) => (/^https?:\/\//.test(x) ? x : `https://${x}`).replace(/\/+$/, ''));
     setBusy(true); setErr('');
     const link = siteUrl.trim() ? (/^https?:\/\//.test(siteUrl.trim()) ? siteUrl.trim() : `https://${siteUrl.trim()}`) : '';
-    try { const body = { name: name.trim(), group_id: groupId || null, allowed_origins: list, site_url: link }; s ? await api.updateStore(s.id, body) : await api.createStore(body); onSaved(); }
+    const colors = col.mode === 'manual' && col.main ? { mode: 'manual', main: col.main, second: col.second || '' } : { mode: 'auto' };
+    try { const body = { name: name.trim(), group_id: groupId || null, allowed_origins: list, site_url: link, colors }; s ? await api.updateStore(s.id, body) : await api.createStore(body); onSaved(); }
     catch (e2) { setErr(e2.message); } finally { setBusy(false); }
   }
   return (
@@ -210,6 +218,18 @@ function StoreForm({ s, groups, onCancel, onSaved, onDelete }) {
         <label className="span-2"><span>Store website(s)</span>
           <textarea rows="2" value={sites} onChange={(e) => setSites(e.target.value)} placeholder="https://lexarcanada.ca" />
           <span className="help">The shared install line finds this store by these addresses, and only they can load its games. Add one per line (include the www. version if your store uses it). Each address can belong to one store.</span></label>
+        {s && (
+          <div className="span-2 brand-block">
+            <span>Brand colours <span className="optional">for arcade games set to "Match my website"</span></span>
+            <div className="brand-colours">
+              <label className="inline">Main<input type="color" value={col.main || '#7b3ff2'} onChange={pick('main')} /></label>
+              <label className="inline">Second<input type="color" value={col.second || col.main || '#7b3ff2'} onChange={pick('second')} /></label>
+              <span className="muted small">{col.mode === 'manual' ? 'Set by hand.' : col.main ? `Detected from ${col.from || 'the website'}.` : col.error ? `Not detected: ${col.error}` : 'Not detected yet; they are read from the website automatically.'}</span>
+              <button type="button" className="ghost small" disabled={detecting} onClick={redetect}>{detecting ? 'Reading the website…' : 'Detect again'}</button>
+              {col.mode === 'manual' && <button type="button" className="link" onClick={() => setCol({ ...col, mode: 'auto' })}>Use the detected colours</button>}
+            </div>
+          </div>
+        )}
       </div>
       {err && <p className="error">{err}</p>}
       <div className="form-actions">
@@ -241,6 +261,28 @@ function InstallLine() {
   );
 }
 
+// Loads the store's website like a visitor would and lists what stops the games from showing, with the fix.
+function InstallCheck({ s }) {
+  const [r, setR] = useState(null); const [err, setErr] = useState('');
+  const run = () => { setR(null); setErr(''); api.checkStore(s.id).then(setR).catch((e) => setErr(e.message)); };
+  useEffect(run, [s.id]);
+  return (
+    <div className="install-check">
+      {!r && !err && <p className="muted">Opening {s.site_url || s.allowed_origins[0] || 'the website'}…</p>}
+      {err && <p className="error">{err}</p>}
+      {r && (
+        <>
+          <p className={r.ok ? 'good' : 'bad'}><b>{r.ok ? 'All good: the games should show on this store.' : 'Something stops the games from showing:'}</b>{r.url && <span className="muted small"> ({r.url})</span>}</p>
+          <ul className="check-list">
+            {r.checks.map((c, i) => <li key={i} className={c.ok ? 'ok' : 'no'}><span aria-hidden="true">{c.ok ? '✓' : '✕'}</span><div><b>{c.label}</b>{c.fix && <p className="muted small">{c.fix}</p>}</div></li>)}
+          </ul>
+          <button className="ghost small" onClick={run}>Check again</button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function StoreCard({ s, groups, reload }) {
   const [mode, setMode] = useState(null); // null | 'edit' | 'install'
   // stores without a website listed need the store's own key in the line
@@ -257,6 +299,7 @@ function StoreCard({ s, groups, reload }) {
             <div className="store-meta">
               {s.group_name ? <span className="pill">{s.group_name}</span> : <span className="pill failed">No group: no games show</span>}
               <span className="muted">{s.allowed_origins.length ? s.allowed_origins.join(', ') : 'No website listed'}</span>
+              {s.colors?.main && <span className="brand-colours" title="Brand colours (for arcade games set to match the website)"><i className="sw" style={{ background: s.colors.main }} />{s.colors.second && <i className="sw" style={{ background: s.colors.second }} />}</span>}
             </div>
             <div className="store-games">
               {s.group_name && (live.length
@@ -266,6 +309,7 @@ function StoreCard({ s, groups, reload }) {
           </div>
         </div>
         <div className="store-actions">
+          <button className={mode === 'check' ? 'primary' : ''} onClick={() => setMode(mode === 'check' ? null : 'check')}>Check install</button>
           <button className={mode === 'install' ? 'primary' : ''} onClick={() => setMode(mode === 'install' ? null : 'install')}>Install on Shopify</button>
           <button className="ghost" onClick={() => setMode(mode === 'edit' ? null : 'edit')}>{mode === 'edit' ? 'Close' : 'Edit'}</button>
         </div>
@@ -282,6 +326,7 @@ function StoreCard({ s, groups, reload }) {
           </ol>
         </div>
       )}
+      {mode === 'check' && <InstallCheck s={s} />}
       {mode === 'edit' && <StoreForm s={s} groups={groups} onCancel={() => setMode(null)} onSaved={() => { setMode(null); reload(); }} onDelete={del} />}
     </article>
   );
