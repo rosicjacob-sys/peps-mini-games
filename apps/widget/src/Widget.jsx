@@ -18,7 +18,7 @@ const GAMES = { wheel: [Wheel], blackjack: [Blackjack, Wheel], slots: [Slots], c
   scratch: [ScratchCard], gifts: [GiftBoxes], plinko: [Plinko], spin: [Wheel] };
 
 function cssVars(game) {
-  const th = gameTheme(game);
+  const th = gameTheme(game, game.site);
   const accent = (!GAME_TYPES[game.type]?.fixedTheme && game.brandAccent) || th.accent;
   const rim = th.rim || accent;
   return {
@@ -97,7 +97,8 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
   const loadGames = (refresh) => fetch(`${api}/api/public/config?key=${encodeURIComponent(store)}`, { cache: 'no-store' })
     .then((r) => (r.ok ? r.json() : Promise.reject()))
     .then((d) => {
-      const list = d.games.filter((g) => GAMES[g.type] && (!gameType || g.type === gameType));
+      // each game carries this store's website colours (used by arcade games set to match the site)
+      const list = d.games.filter((g) => GAMES[g.type] && (!gameType || g.type === gameType)).map((g) => ({ ...g, site: d.site }));
       setGames(list);
       setGame((cur) => (list.length === 1 ? list[0] : cur && list.find((g) => g.id === cur.id)) || null);
     })

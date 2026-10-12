@@ -25,7 +25,7 @@ export function playUrl(store) {
 
 // the game (look, subject, sender with its group's defaults) and the store the player played on (name and link);
 // without a store (the dashboard preview) the group's first store is used
-const GAME_SQL = `SELECT g.*, s.id AS store_id, s.name AS store_name, s.site_url, s.allowed_origins,
+const GAME_SQL = `SELECT g.*, s.id AS store_id, s.name AS store_name, s.site_url, s.allowed_origins, s.colors AS store_colors,
     sg.from_name AS group_from_name, sg.from_email AS group_from_email, sg.reply_to AS group_reply_to
   FROM games g LEFT JOIN store_groups sg ON sg.id = g.group_id
   LEFT JOIN LATERAL (SELECT * FROM stores x WHERE ($2::uuid IS NOT NULL AND x.id = $2) OR ($2::uuid IS NULL AND x.group_id = g.group_id)

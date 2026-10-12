@@ -353,3 +353,19 @@ button.primary-outline { border-color: var(--primary); font-weight: 650; }
 .found-colour { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 4px 6px; }
 .found-colour i { width: 18px; height: 18px; border-radius: 5px; border: 1px solid rgba(0,0,0,.15); }
 .found-colour code { font-size: 12px; }
+
+.store-colours { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 14px; }
+.store-colour { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sc-band { min-width: 180px; padding: 8px 14px; border-radius: 10px; font-weight: 700; font-size: 13px; }
+.fallback-label { margin: 6px 0 6px; }
+.brand-colours { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.brand-colours .sw { width: 26px; height: 26px; border-radius: 7px; border: 1px solid rgba(0,0,0,.15); display: inline-block; vertical-align: middle; }
+.brand-block { display: flex; flex-direction: column; gap: 6px; }
+label.inline { flex-direction: row; align-items: center; gap: 6px; }
+.brand-colours i.sw { width: 18px; height: 18px; }
+.install-check { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.check-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.check-list li { display: flex; gap: 10px; align-items: flex-start; }
+.check-list li > span { font-weight: 700; width: 18px; flex: none; }
+.check-list li.ok > span { color: var(--good, #2e7d32); } .check-list li.no > span { color: var(--critical-text, #c62828); }
+.check-list p { margin: 2px 0 0; }

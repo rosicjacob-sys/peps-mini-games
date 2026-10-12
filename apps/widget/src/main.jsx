@@ -22,7 +22,8 @@ function loadFont(assetBase) {
 export function mount({ store = '', api, locale, game, ageSelector, introPages, assetBase }) {
   loadFont(assetBase);
   const host = document.createElement('div');
-  host.setAttribute('data-peps-games', '');
+  // the version marker the dashboard's "Check install" looks for (this build supports the shared, keyless line)
+  host.setAttribute('data-peps-games', 'pg-groups-v1');
   document.body.appendChild(host);
   const shadow = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');

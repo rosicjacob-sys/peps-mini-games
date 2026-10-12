@@ -9,6 +9,8 @@ import { q, pool } from './db.js';
 import { weekInfo, normalizeEmail, pickRewards, hashIp, formatDate, secureRandom, isTestEmail } from './lib.js';
 import crypto from 'node:crypto';
 import { unsubToken } from './reminders.js';
+import { detectStoreColors } from './colors.js';
+import { isHex } from '@peps/shared';
 
 export const publicRouter = Router();
 publicRouter.use(cors({ origin: true }));
@@ -49,8 +51,14 @@ publicRouter.get('/config', async (req, res) => {
     const { rows: rewards } = await q('SELECT id, title, subtitle, symbol, probability, sort FROM rewards WHERE game_id = $1 AND active ORDER BY sort, id', [g.id]);
     if (rewards.length) out.push(publicGame(g, rewards));
   }
+  // the store's own website colours (arcade games set to "Match my website" use them); not read yet: read them now
+  // in the background (at most once a day), the next visitor gets them
+  const c = store.colors || {};
+  const site = isHex(c.main) ? { main: c.main, second: isHex(c.second) ? c.second : '' } : null;
+  const hasSite = store.site_url || store.allowed_origins.length;
+  if (!site && hasSite && c.mode !== 'manual' && (!c.tried_at || Date.now() - Date.parse(c.tried_at) > 864e5)) detectStoreColors(store.id).catch(() => {});
   // never reuse an old list: pausing a game in the dashboard must take effect on the next page load
-  res.set('Cache-Control', 'no-cache').json({ games: out });
+  res.set('Cache-Control', 'no-cache').json({ games: out, site });
 });
 
 // One play per email per game per ET week. The server rolls the outcome; the widget only animates it.
