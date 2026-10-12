@@ -15,7 +15,7 @@ import { sound } from './sound.js';
 
 // Stages a play goes through before the result screen. Blackjack is a warm-up hand, then the wheel decides the reward.
 const GAMES = { wheel: [Wheel], blackjack: [Blackjack, Wheel], slots: [Slots], color: [ColorGame], lucky9: [Lucky9, Wheel], baccarat: [Baccarat, Wheel], poker: [Poker],
-  scratch: [ScratchCard], gifts: [GiftBoxes], plinko: [Plinko] };
+  scratch: [ScratchCard], gifts: [GiftBoxes], plinko: [Plinko], spin: [Wheel] };
 
 function cssVars(game) {
   const th = themeFor(game.type, game.theme);
@@ -111,9 +111,17 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
   // closing forgets the chosen game when the store has several, so "Play & Win" opens the picker again
   const close = () => { setOpen(false); if (games?.length > 1) setGame(null); };
 
+  // Arriving from a reminder email (?pg_play=1): open the game straight away, after age verification.
+  const fromReminder = useMemo(() => store_(() => new URLSearchParams(location.search).has('pg_play')), []);
+  useEffect(() => {
+    if (!current || !fromReminder) return;
+    store_(() => { const u = new URL(location.href); u.searchParams.delete('pg_play'); history.replaceState(history.state, '', u); });
+    return whenAgeGateClear(ageSelector || DEFAULT_GATE, () => setOpen(true));
+  }, [current?.id]);
+
   // Intro popup: homepage only, every visit (once per browser session), straight after age verification.
   useEffect(() => {
-    if (!current) return;
+    if (!current || fromReminder) return;
     if (current.texts?.intro?.enabled === false) return;
     if (introPages !== 'all' && !isHome()) return;
     if (store_(() => sessionStorage.getItem('pg_intro_done')) || playedThisWeek(store)) return;
@@ -307,7 +315,6 @@ function Play({ game, arcade, api, store, locale, onClose, onBack }) {
       {result.rewards.map((r) => <RewardCard key={r.id} r={r} locale={locale} />)}
       <p className="redeem">🛒 {ui.redeem}</p>
       <p className="fine strong">{ui.limited}</p>
-      <p className="fine">{ui.emailed} {result.email}</p>
       <button className="btn ghost" onClick={onClose}>{ui.close}</button>
     </div>
   );

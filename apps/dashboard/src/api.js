@@ -44,8 +44,10 @@ export const api = {
   overview: (f) => req(`/reports/overview?${qs(f)}`),
   players: (f) => req(`/players?${qs(f)}`),
   player: (email) => req(`/players/${encodeURIComponent(email)}`),
-  deliveries: (f) => req(`/deliveries?${qs(f)}`),
-  resend: (id) => req(`/plays/${id}/resend`, { method: 'POST' }),
+  reminders: (f) => req(`/reminders?${qs(f)}`),
+  resendReminder: (id) => req(`/reminders/${id}/resend`, { method: 'POST' }),
+  runReminders: () => req('/reminders/run', { method: 'POST' }),
+  previewReminder: (gameId, locale) => req(`/reminders/preview?game_id=${gameId}&locale=${locale}`),
   async download(path, f, filename) {
     const res = await fetch(`${BASE}/api/admin${path}?${qs(f)}`, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) throw new Error('Export failed');

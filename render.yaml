@@ -30,8 +30,10 @@ services:
         generateValue: true
       - key: DASHBOARD_PASSWORD   # shared admin password — set it in the Render dashboard
         sync: false
-      - key: RESEND_API_KEY       # Resend account API key
+      - key: RESEND_API_KEY       # Resend account API key (weekly reminder emails)
         sync: false
+      - key: REMINDERS            # weekly "play again" emails after the Monday reset; set to "off" to pause them
+        value: "on"
       - key: DASHBOARD_ORIGIN     # e.g. https://peps-games-dashboard.onrender.com
         sync: false
 

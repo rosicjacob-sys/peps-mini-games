@@ -4,7 +4,7 @@ import { GAME_TYPES, CATEGORIES, categoryOf, themeFor } from '@peps/shared';
 import GameEditor from './GameEditor.jsx';
 import Overview, { PageHead } from './pages/Overview.jsx';
 import Players from './pages/Players.jsx';
-import Delivery from './pages/Delivery.jsx';
+import Reminders from './pages/Reminders.jsx';
 import Library from './pages/Library.jsx';
 import { FiltersProvider, useFilters } from './filters.jsx';
 import { fmtInt } from './format.js';
@@ -14,7 +14,7 @@ const parse = () => { const [, name = 'overview', id] = location.hash.split('/')
 const NAV = [
   { key: 'overview', label: 'Overview', icon: 'M3 13h4v5H3zM8.5 8h4v10h-4zM14 3h4v15h-4z' },
   { key: 'players', label: 'Players', icon: 'M10 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3 18c.8-3.5 3.6-5.5 7-5.5s6.2 2 7 5.5' },
-  { key: 'delivery', label: 'Email delivery', icon: 'M2.5 5h15v10h-15zM2.5 5.5 10 11l7.5-5.5' },
+  { key: 'delivery', label: 'Reminder emails', icon: 'M2.5 5h15v10h-15zM2.5 5.5 10 11l7.5-5.5' },
   { section: 'Setup' },
   { key: 'games', label: 'Games', icon: 'M10 2.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15zM10 6v8M6 10h8' },
   { key: 'rewards', label: 'Rewards library', icon: 'M3 8h14v9H3zM2 5h16v3H2zM10 5v12M10 5c-1.5-3-5-3-5-1s3 1 5 1c2 0 5 1 5-1s-3.5-2-5 1' },
@@ -64,7 +64,7 @@ export default function App() {
         <main className="main">
           {route.name === 'overview' && <Overview go={go} />}
           {route.name === 'players' && <Players key={extra.reward_id || ''} initial={extra} clearInitial={() => setExtra({})} />}
-          {route.name === 'delivery' && <Delivery />}
+          {route.name === 'delivery' && <Reminders />}
           {route.name === 'games' && !route.id && <Games open={(id) => (location.hash = `#/games/${id}`)} />}
           {route.name === 'games' && route.id && <GameEditor id={route.id} back={() => (location.hash = '#/games')} />}
           {route.name === 'stores' && <Stores />}
@@ -186,11 +186,13 @@ function Stores() {
 function StoreForm({ s, groups, onCancel, onSaved, onDelete }) {
   const [name, setName] = useState(s?.name || ''); const [groupId, setGroupId] = useState(s?.group_id || '');
   const [sites, setSites] = useState((s?.allowed_origins || []).join('\n')); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+  const [siteUrl, setSiteUrl] = useState(s?.site_url || '');
   async function save(e) {
     e.preventDefault(); if (!name.trim()) return setErr('Give the store a name.');
     const list = sites.split(/[\n,\s]+/).map((x) => x.trim()).filter(Boolean).map((x) => (/^https?:\/\//.test(x) ? x : `https://${x}`).replace(/\/+$/, ''));
     setBusy(true); setErr('');
-    try { const body = { name: name.trim(), group_id: groupId || null, allowed_origins: list }; s ? await api.updateStore(s.id, body) : await api.createStore(body); onSaved(); }
+    const link = siteUrl.trim() ? (/^https?:\/\//.test(siteUrl.trim()) ? siteUrl.trim() : `https://${siteUrl.trim()}`) : '';
+    try { const body = { name: name.trim(), group_id: groupId || null, allowed_origins: list, site_url: link }; s ? await api.updateStore(s.id, body) : await api.createStore(body); onSaved(); }
     catch (e2) { setErr(e2.message); } finally { setBusy(false); }
   }
   return (
@@ -200,8 +202,11 @@ function StoreForm({ s, groups, onCancel, onSaved, onDelete }) {
         <label>Store name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Lexar Canada" autoFocus={!s} /></label>
         <label>Store group<select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
           <option value="">No group</option>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
-          <span className="help">Code emails use the group's sender address. <a href="#/groups">Manage groups</a></span></label>
-        <label className="span-2"><span>Store website <span className="optional">optional</span></span>
+          <span className="help">Reminder emails use the group's sender address. <a href="#/groups">Manage groups</a></span></label>
+        <label className="span-2"><span>Link in reminder emails <span className="optional">recommended</span></span>
+          <input value={siteUrl} onChange={(e) => setSiteUrl(e.target.value)} placeholder="https://lexarcanada.ca" />
+          <span className="help">Where the weekly reminder's "Play now" button goes (usually your homepage); the game opens by itself when they arrive. Blank: the first allowed website below.</span></label>
+        <label className="span-2"><span>Allowed websites <span className="optional">optional</span></span>
           <textarea rows="2" value={sites} onChange={(e) => setSites(e.target.value)} placeholder="https://lexarcanada.ca" />
           <span className="help">Only these addresses can load the games. This stops other sites copying your install code. Add one per line (include the www. version if your store uses it). Leave empty while testing.</span></label>
       </div>

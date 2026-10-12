@@ -3,13 +3,14 @@ import crypto from 'node:crypto';
 
 const ZONE = 'America/Toronto'; // "ET"
 
-// Play weeks run Monday 00:00 -> Sunday 23:59:59 ET. Codes expire at the end of that window.
+// Play weeks run Monday 00:00 -> Sunday 23:59:59 ET.
 export function weekInfo(now = DateTime.now()) {
   const et = now.setZone(ZONE);
   const start = et.startOf('week'); // luxon weeks start Monday
   const end = start.plus({ weeks: 1 });
   return {
     weekKey: start.toISODate(),
+    prevWeekKey: start.minus({ weeks: 1 }).toISODate(),
     expiresAt: end.minus({ seconds: 1 }).toISO(),       // Sunday 23:59:59 ET
     nextPlayAt: end.toISO(),                            // Monday 00:00 ET
   };

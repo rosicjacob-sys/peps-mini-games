@@ -36,7 +36,7 @@ export default function Players({ initial = {}, clearInitial }) {
           <tbody>
             {data?.rows.map((r) => (
               <tr key={r.email_norm} className="click" onClick={() => setOpen(r.email)} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setOpen(r.email)}>
-                <td><b>{r.email}</b>{r.failed > 0 && <span className="pill failed" title="A code email to this player failed">✕ email</span>}</td>
+                <td><b>{r.email}</b></td>
                 <td className="num">{fmtInt(r.plays)}</td>
                 <td>{r.last_reward ? tr(r.last_reward) : <span className="muted">No reward</span>}</td>
                 <td className="muted">{r.stores.join(', ')}</td>
@@ -60,10 +60,9 @@ export default function Players({ initial = {}, clearInitial }) {
 }
 
 export function PlayerDrawer({ email, onClose }) {
-  const [d, setD] = useState(null); const [busy, setBusy] = useState(''); const [msg, setMsg] = useState('');
+  const [d, setD] = useState(null);
   const load = () => api.player(email).then(setD);
   useEffect(() => { load(); const k = (e) => e.key === 'Escape' && onClose(); addEventListener('keydown', k); return () => removeEventListener('keydown', k); }, [email]);
-  const resend = async (id) => { setBusy(id); setMsg(''); try { const r = await api.resend(id); setMsg(r.ok ? 'Email sent.' : `Still failing: ${r.error}`); await load(); } finally { setBusy(''); } };
   const real = d?.plays.filter((p) => !p.is_test) || [];
   return (
     <div className="drawer-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -76,7 +75,6 @@ export function PlayerDrawer({ email, onClose }) {
               <div><b>{real.length ? fmtDateShort(real[real.length - 1].created_at) : '-'}</b><span>first played</span></div>
               <div><b>{new Set(real.map((p) => p.store)).size}</b><span>stores</span></div>
             </div>
-            {msg && <div className="alert info">{msg}</div>}
             <ol className="timeline">
               {d.plays.map((p) => (
                 <li key={p.id}>
@@ -84,16 +82,22 @@ export function PlayerDrawer({ email, onClose }) {
                   <div className="tl-body">
                     <div><b>{p.rewards ? p.rewards.map((x) => tr(x.title)).join(', ') : 'No reward (lost)'}</b> {(p.rewards || []).map((x) => <code key={x.code}>{x.code}</code>)}</div>
                     <div className="muted small">{TYPE_LABEL[p.type]} · {p.store}{p.store_group ? ` · ${p.store_group}` : ''} · {p.locale.toUpperCase()}</div>
-                    <div className="tl-status">
-                      <span className={`pill ${p.email_status}`}>{{ sent: '✓ email sent', failed: '✕ email failed', pending: '… pending', skipped: 'no email (lost)' }[p.email_status]}</span>
-                      {p.is_test && <span className="pill">test</span>}
-                      {['failed', 'pending'].includes(p.email_status) && <button className="ghost small" disabled={busy === p.id} onClick={() => resend(p.id)}>{busy === p.id ? 'Sending…' : 'Resend code'}</button>}
-                    </div>
-                    {p.email_error && <div className="muted small">{p.email_error}</div>}
+                    {p.is_test && <div className="tl-status"><span className="pill">test</span></div>}
                   </div>
                 </li>
               ))}
             </ol>
+            <h3 className="drawer-sub">Reminder emails</h3>
+            {d.reminders?.length ? (
+              <ul className="rem-list">
+                {d.reminders.map((r) => (
+                  <li key={r.id}><span className={`pill ${r.status}`}>{{ sent: '✓ sent', failed: '✕ failed', pending: '… pending', skipped: '– skipped' }[r.status]}</span>
+                    <span>{r.store} · week of {new Date(`${r.week_key}T12:00:00`).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}{r.sent_at ? ` · sent ${fmtDateTime(r.sent_at)}` : ''}</span>
+                    {r.error && <span className="muted small">{r.error}</span>}</li>
+                ))}
+              </ul>
+            ) : <p className="muted small">None yet. Players get one after the Monday reset following a week they played.</p>}
+            {d.reminders?.some((r) => r.unsubscribed) && <p className="muted small">Unsubscribed from: {[...new Set(d.reminders.filter((r) => r.unsubscribed).map((r) => r.store))].join(', ')}</p>}
           </>
         )}
       </aside>

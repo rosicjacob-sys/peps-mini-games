@@ -1,10 +1,10 @@
 # Peps Mini Games
 
 Promo mini-games for Shopify stores, hosted outside the theme. Edit rewards, odds, colours and text in the
-dashboard — no theme edits, no redeploys. Each store loads games with one `<script>` line.
+dashboard: no theme edits, no redeploys. Each store loads games with one `<script>` line.
 
 ```
-apps/api         Node + Express + Postgres  (odds, weekly limit, codes, Resend email, admin API)
+apps/api         Node + Express + Postgres  (odds, weekly limit, codes, weekly reminder emails via Resend, admin API)
 apps/dashboard   React admin UI             (stores, games, rewards/odds, players, CSV export)
 apps/widget      React → one widget.js      (the game players see; runs in a Shadow DOM)
 packages/shared  themes, game types, EN/FR strings
@@ -22,30 +22,36 @@ render.yaml      Render Blueprint
   probability %. Active rewards must total 100%. `Rewards per play` controls how many are drawn per play.
 - The **server** rolls the outcome (the widget only animates it), so odds can't be tampered with in the browser.
 - **Losing.** Each game has a "No reward" chance next to the reward probabilities (together they total 100%). A lost
-  play is lost in the game itself (dealer/banker wins, no match, no winning hand, or "Try again" on the wheel), sends no
-  email, and ends on "Not this time — try again on <next Monday>" with a note about weekly promotions. It still uses
+  play is lost in the game itself (dealer/banker wins, no match, no winning hand, or "Try again" on the wheel) and ends on "Not this time: try again on <next Monday>" with a note about weekly promotions. It still uses
   that week's play. Reports show "No reward (lost)" per game against the chance you set.
 - **Card rules.** Lucky 9: the player may draw unless they hold a natural 9; the banker draws on 0–5 and never ends on 9.
   Blackjack: the dealer never reaches 21. Baccarat: standard third-card rules; the banker never ends on 9.
-- **One play per email per game per week.** Weeks run Monday 12:00 AM → Sunday 11:59 PM ET (America/Toronto);
-  codes are stated as single-use and expiring Sunday 11:59 PM ET. Gmail dots/`+tags` are normalised.
-- The code is shown on screen and emailed through Resend (from-address is set per game).
+- **One play per email per week, across all of a store's games.** Weeks run Monday 12:00 AM → Sunday 11:59 PM ET
+  (America/Toronto); a different email can play again. Gmail dots/`+tags` are normalised.
+- The code is shown **on screen only** (no code email).
+- **Weekly reminder email.** After each Monday reset, everyone who played a store's games the week before gets one
+  email (Resend, from the game's sender) inviting them to play again; its "Play now" button opens the store with the
+  game already open. Skipped: test emails, unsubscribed addresses (every email has an unsubscribe link and a one-click
+  `List-Unsubscribe` header) and anyone who already played again. The API checks every 15 minutes, never sends a
+  reminder twice and retries failures up to 3 times. Per game on/off + subject in **Texts & Email**; the link is the
+  store's "Link in reminder emails". `REMINDERS=off` pauses them all.
 - Dashboard → Players: plays, unique emails, tally per reward, emails per reward, CSV export.
 
 ## Dashboard
-- **Overview** — KPI tiles with change vs the previous period (plays, unique/new/returning players, plays per player,
-  email delivery), plays over time against the previous period, insights, new vs returning players, a weekday × hour
+- **Overview**: KPI tiles with change vs the previous period (plays, unique/new/returning players, plays per player,
+  reminder delivery), plays over time against the previous period, insights, new vs returning players, a weekday × hour
   heatmap (ET), rewards won vs the probability you set (flags only gaps beyond chance), breakdowns by group/store/game,
   language split and latest plays. Every chart has a table view. Each game's **Stats** tab shows the same, scoped to it.
-- **Players** — searchable directory with history per email; **Email delivery** — failures with Resend's reason and a resend button.
+- **Players**: searchable directory with history (plays and reminders) per email; **Reminder emails**: every weekly
+  reminder with its status, Resend's reason when one fails, a send button, "Send due reminders now" and a preview per game.
 - One filter row scopes everything: date range (ET presets or custom), store group, store, game. CSV exports follow it.
 
 ## Visitor flow
 1. Visitor passes the theme's age verification.
 2. On the **homepage only**, a "Play to Win" popup appears right away (once per visit). Copy, steps, buttons and an
    optional image are edited per game in the dashboard (**Intro popup** tab, English + French). Visitors can switch
-   EN / FR with the toggle; their choice is remembered and also sets the language of the code email.
-3. **Play now** → email step (privacy notice) → game → code on screen + by email. **No thanks** closes it; the floating
+   EN / FR with the toggle; their choice is remembered and also sets the language of their reminder email.
+3. **Play now** → email step (privacy notice) → game → code on screen. **No thanks** closes it; the floating
    button stays. The popup does not return the same visit, and stays away after a play until the next week.
 
 The popup waits for the age gate by watching for an element matching `[id*="age-gate"], [class*="age-gate"], [data-age-gate]`
@@ -74,7 +80,7 @@ Optional attributes on the `<script>` tag:
 Changing a `VITE_*` var needs a redeploy of that static site.
 
 **Test emails.** `mosada.jerome.d@gmail.com`, `vantatechca@gmail.com` and `rosicjacob@gmail.com` can play without
-limit; their plays are not counted in stats, tallies or exports, and they still receive the code email. Change the
+limit; their plays are not counted in stats, tallies or exports, and they never get reminder emails. Change the
 list with `TEST_EMAILS=a@x.com,b@y.com` on the API service. `PLAY_RATE_LIMIT` (default 20) caps plays per minute per IP.
 
 ## Local dev
@@ -92,5 +98,5 @@ npm run dev:widget     # :5174  → /?store=<public_key>&api=http://localhost:30
 - [x] Color Game (each reward sits on one of six colours; two or three dice of a colour win it; max 6 rewards)
 - [x] Lucky 9 (draw or stand, closest to 9; the player wins, then spins the wheel for the reward)
 - [x] Baccarat (bet Player / Banker / Tie, standard third-card rules; the bet wins, then the wheel decides the reward)
-- [x] Poker (5 cards, no draw; a paytable maps each reward to a hand — rarer reward, better hand)
+- [x] Poker (5 cards, no draw; a paytable maps each reward to a hand: rarer reward, better hand)
 - [x] Blackjack (the player wins a warm-up hand with hit/stand, then spins the wheel that decides the reward; fixed purple theme)

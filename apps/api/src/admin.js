@@ -57,14 +57,16 @@ adminRouter.get('/stores', wrap(async (_req, res) => {
   const { rows } = await q(`SELECT s.*, sg.name AS group_name, (SELECT count(*)::int FROM games g WHERE g.store_id = s.id) AS game_count FROM stores s LEFT JOIN store_groups sg ON sg.id = s.group_id ORDER BY sg.sort, sg.name NULLS LAST, s.created_at`);
   res.json(rows);
 }));
+// the store's website, used for the "Play now" button in reminder emails (http(s) only)
+const siteUrl = (v) => { try { const u = new URL(String(v || '').trim()); return /^https?:$/.test(u.protocol) ? u.toString().slice(0, 300) : null; } catch { return null; } };
 adminRouter.post('/stores', wrap(async (req, res) => {
   const origins = (req.body.allowed_origins || []).map((o) => String(o).trim().replace(/\/$/, '')).filter(Boolean);
-  const { rows } = await q('INSERT INTO stores (name, allowed_origins, group_id) VALUES ($1,$2,$3) RETURNING *', [String(req.body.name || '').trim() || 'Untitled store', origins, req.body.group_id || null]);
+  const { rows } = await q('INSERT INTO stores (name, allowed_origins, group_id, site_url) VALUES ($1,$2,$3,$4) RETURNING *', [String(req.body.name || '').trim() || 'Untitled store', origins, req.body.group_id || null, siteUrl(req.body.site_url)]);
   res.status(201).json(rows[0]);
 }));
 adminRouter.put('/stores/:id', wrap(async (req, res) => {
   const origins = (req.body.allowed_origins || []).map((o) => String(o).trim().replace(/\/$/, '')).filter(Boolean);
-  const { rows } = await q('UPDATE stores SET name = $2, allowed_origins = $3, group_id = $4 WHERE id = $1 RETURNING *', [req.params.id, String(req.body.name || '').trim(), origins, req.body.group_id || null]);
+  const { rows } = await q('UPDATE stores SET name = $2, allowed_origins = $3, group_id = $4, site_url = $5 WHERE id = $1 RETURNING *', [req.params.id, String(req.body.name || '').trim(), origins, req.body.group_id || null, siteUrl(req.body.site_url)]);
   rows[0] ? res.json(rows[0]) : res.sendStatus(404);
 }));
 adminRouter.delete('/stores/:id', wrap(async (req, res) => { await q('DELETE FROM stores WHERE id = $1', [req.params.id]); res.sendStatus(204); }));
@@ -105,7 +107,7 @@ function gameFields(b) {
     type: b.type, name: String(b.name || GAME_TYPES[b.type].label).slice(0, 80),
     status: b.status === 'paused' ? 'paused' : 'active', theme, brand,
     per: singleReward(b.type) ? 1 : Math.min(5, Math.max(1, parseInt(b.rewards_per_play, 10) || 1)),
-    texts: { heading: loc(tx.heading), subheading: loc(tx.subheading), privacy: loc(tx.privacy), triggerLabel: loc(tx.triggerLabel), privacyUrl: String(tx.privacyUrl || '').slice(0, 300), intro: cleanIntro(tx.intro), sound: cleanSound(tx.sound) },
+    texts: { heading: loc(tx.heading), subheading: loc(tx.subheading), privacy: loc(tx.privacy), triggerLabel: loc(tx.triggerLabel), privacyUrl: String(tx.privacyUrl || '').slice(0, 300), intro: cleanIntro(tx.intro), sound: cleanSound(tx.sound), reminder: { enabled: tx.reminder?.enabled !== false } },
     from_name: String(b.from_name || '').slice(0, 120), from_email: String(b.from_email || '').trim().slice(0, 254), reply_to: String(b.reply_to || '').trim().slice(0, 254),
     subject: loc(b.email_subject),
   };
