@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { pickLocale, GAME_TYPES } from '@peps/shared';
@@ -8,7 +8,7 @@ import { singleReward } from '@peps/shared';
 import { q, pool } from './db.js';
 import { weekInfo, normalizeEmail, pickRewards, hashIp, formatDate, secureRandom, isTestEmail } from './lib.js';
 import crypto from 'node:crypto';
-import { buildEmail, sendEmail } from './email.js';
+import { unsubToken } from './reminders.js';
 
 export const publicRouter = Router();
 publicRouter.use(cors({ origin: true }));
@@ -82,7 +82,7 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
     const ins = await client.query(
       `INSERT INTO plays (game_id, email, email_norm, week_key, locale, ip_hash, is_test, email_status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (game_id, email_norm, week_key) DO NOTHING RETURNING id`,
-      [game.id, mail.email, mail.norm, weekKey, locale, hashIp(req.ip), test, lost ? 'skipped' : 'pending']);
+      [game.id, mail.email, mail.norm, weekKey, locale, hashIp(req.ip), test, 'skipped']);
     if (!ins.rowCount) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'already_played', email: mail.email, nextPlayAt: week.nextPlayAt, nextPlayText: formatDate(week.nextPlayAt, locale) }); }
     playId = ins.rows[0].id;
     for (const r of picks) {
@@ -95,10 +95,7 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
     console.error(e); return res.status(500).json({ error: 'server_error' });
   } finally { client.release(); }
 
-  // Email is sent after responding so the player is never blocked by Resend. A loss sends nothing.
-  if (!lost) sendEmail({ game, to: mail.email, mail: buildEmail({ game, rewards: picks, locale }) })
-    .then((r) => q('UPDATE plays SET email_status = $2, email_error = $3, last_email_at = now() WHERE id = $1', [playId, r.ok ? 'sent' : 'failed', r.ok ? null : r.error]))
-    .catch((e) => { console.error(e); return q("UPDATE plays SET email_status = 'failed', email_error = $2, last_email_at = now() WHERE id = $1", [playId, String(e.message || e).slice(0, 300)]); });
+  // Codes are shown on screen only (no code email). Players hear from us again in the weekly reminder.
 
   res.json({
     email: mail.email,
@@ -118,3 +115,23 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
     expiresAt: week.expiresAt,
   });
 });
+
+// Unsubscribe from a store's weekly reminders. GET from the email's link; POST from mail apps' one-click button.
+const UNSUB_PAGE = (ok) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${ok ? 'Unsubscribed' : 'Link not valid'}</title></head>
+<body style="font-family:Arial,Helvetica,sans-serif;background:#f4f4f6;color:#111827;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0">
+<div style="background:#fff;border-radius:16px;padding:32px 28px;max-width:440px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.08)">
+${ok ? `<h1 style="margin:0 0 10px;font-size:22px">You are unsubscribed</h1><p style="margin:0;line-height:1.5">You will not get weekly game reminders from this store any more.</p>
+<hr style="border:0;border-top:1px solid #e5e7eb;margin:20px 0"><h2 style="margin:0 0 8px;font-size:18px">Vous êtes désabonné</h2><p style="margin:0;line-height:1.5">Vous ne recevrez plus les rappels de jeu hebdomadaires de cette boutique.</p>`
+    : `<h1 style="margin:0 0 10px;font-size:22px">This link is not valid</h1><p style="margin:0">Ce lien n’est pas valide.</p>`}
+</div></body></html>`;
+async function unsubscribe(req, res) {
+  const { s, e, t } = { ...req.query, ...(req.body || {}) };
+  const ok = /^[0-9a-f-]{36}$/i.test(s || '') && e && t && crypto.timingSafeEqual(Buffer.from(String(t).padEnd(32).slice(0, 32)), Buffer.from(unsubToken(s, String(e))));
+  if (ok) {
+    await q('INSERT INTO unsubscribes (store_id, email_norm) VALUES ($1, $2) ON CONFLICT DO NOTHING', [s, String(e)]).catch(() => {});
+    await q(`UPDATE reminders SET status = 'skipped', error = 'Unsubscribed' WHERE store_id = $1 AND email_norm = $2 AND status IN ('pending', 'failed')`, [s, String(e)]).catch(() => {});
+  }
+  res.status(ok ? 200 : 400).type('html').send(UNSUB_PAGE(ok));
+}
+publicRouter.get('/unsubscribe', unsubscribe);
+publicRouter.post('/unsubscribe', express.urlencoded({ extended: false }), unsubscribe);

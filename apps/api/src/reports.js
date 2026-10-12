@@ -1,9 +1,9 @@
-// Reporting: overview KPIs and charts, players directory, email delivery, filtered exports.
+// Reporting: overview KPIs and charts, players directory, weekly reminder emails, filtered exports.
 // Every report takes the same filters: from/to (ET calendar dates, inclusive), group_id, store_id, game_id.
 // Test-email plays are always excluded.
 import { DateTime } from 'luxon';
 import { q } from './db.js';
-import { buildEmail, sendEmail } from './email.js';
+import { runReminders, deliver, reminderFor } from './reminders.js';
 import { normalizeEmail } from './lib.js';
 
 const ZONE = 'America/Toronto';
@@ -41,13 +41,30 @@ function inRange(params, from, to) {
 }
 const where = (parts) => (parts.length ? `WHERE ${parts.join(' AND ')}` : '');
 
+// weekly reminder emails, filtered like plays (their store, group and the game they were about)
+const RBASE = `FROM reminders r JOIN stores s ON s.id = r.store_id LEFT JOIN store_groups sg ON sg.id = s.group_id LEFT JOIN games g ON g.id = r.game_id`;
+function rScope(qs, params, from, to) {
+  const w = [];
+  if (UUID.test(qs.group_id || '')) { params.push(qs.group_id); w.push(`s.group_id = $${params.length}`); }
+  if (qs.group_id === 'none') w.push('s.group_id IS NULL');
+  if (UUID.test(qs.store_id || '')) { params.push(qs.store_id); w.push(`r.store_id = $${params.length}`); }
+  if (UUID.test(qs.game_id || '')) { params.push(qs.game_id); w.push(`r.game_id = $${params.length}`); }
+  if (from) w.push(inRange(params, from, to).replaceAll('p.created_at', 'r.created_at'));
+  return w;
+}
+async function reminderCounts(qs, from, to) {
+  const params = []; const w = rScope(qs, params, from, to);
+  const { rows: [c] } = await q(`SELECT count(*) FILTER (WHERE r.status = 'sent')::int AS sent, count(*) FILTER (WHERE r.status = 'failed')::int AS failed,
+      count(*) FILTER (WHERE r.status = 'pending')::int AS pending, count(*) FILTER (WHERE r.status = 'skipped')::int AS skipped ${RBASE} ${where(w)}`, params);
+  return c;
+}
+
 async function kpis(qs, from, to) {
   const params = []; const w = scope(qs, params); const sc = [...w]; const scParams = [...params];
   w.push(inRange(params, from, to));
-  const { rows: [k] } = await q(`SELECT count(*)::int AS plays, count(DISTINCT p.email_norm)::int AS players,
-      count(*) FILTER (WHERE p.email_status = 'sent')::int AS sent, count(*) FILTER (WHERE p.email_status = 'failed')::int AS failed,
-      count(*) FILTER (WHERE p.email_status = 'pending')::int AS pending, count(*) FILTER (WHERE p.locale = 'fr')::int AS fr
+  const { rows: [k0] } = await q(`SELECT count(*)::int AS plays, count(DISTINCT p.email_norm)::int AS players, count(*) FILTER (WHERE p.locale = 'fr')::int AS fr
     ${BASE} ${where(w)}`, params);
+  const k = { ...k0, ...(await reminderCounts(qs, from, to)) };
   // a "new" player's first ever play (within these group/store/game filters) falls in the period
   const nParams = [...scParams]; const nRange = inRange(nParams, from, to).replaceAll('p.created_at', 'f.first_at');
   const { rows: [n] } = await q(`SELECT count(*)::int AS new_players FROM (
@@ -112,7 +129,7 @@ export function registerReports(router, wrap, csvCell) {
       ${BASE} ${where(s3.w)} GROUP BY 1, 2`, s3.params);
 
     const s4 = P();
-    const recent = q(`SELECT p.id, p.email, p.locale, p.created_at, p.email_status, g.name AS game, g.type, s.name AS store,
+    const recent = q(`SELECT p.id, p.email, p.locale, p.created_at, g.name AS game, g.type, s.name AS store,
         (SELECT json_agg(json_build_object('title', pr.title, 'code', pr.code)) FROM play_rewards pr WHERE pr.play_id = p.id) AS rewards
       ${BASE} ${where(s4.w)} ORDER BY p.created_at DESC LIMIT 12`, s4.params);
 
@@ -151,7 +168,6 @@ export function registerReports(router, wrap, csvCell) {
         array_agg(DISTINCT s.name) AS stores, array_agg(DISTINCT coalesce(sg.name, 'Ungrouped')) AS groups,
         (array_agg(p.locale ORDER BY p.created_at DESC))[1] AS locale,
         (array_agg(pr.title ORDER BY p.created_at DESC))[1] AS last_reward,
-        count(DISTINCT p.id) FILTER (WHERE p.email_status = 'failed')::int AS failed,
         count(*) OVER ()::int AS total
       ${BASE} LEFT JOIN play_rewards pr ON pr.play_id = p.id ${where(w)} GROUP BY p.email_norm ORDER BY ${sort} ${lim}`, params };
   }
@@ -168,58 +184,61 @@ export function registerReports(router, wrap, csvCell) {
     const body = rows.map((x) => [x.email, x.plays, x.rewards, x.first_at.toISOString(), x.last_at.toISOString(), x.stores.join(' | '), x.groups.join(' | '), x.locale, x.last_reward?.en].map(csvCell).join(','));
     res.type('text/csv').set('Content-Disposition', 'attachment; filename="players.csv"').send([head, ...body].join('\n'));
   }));
-  // one player's full history (all time, every store; test plays flagged)
+  // one player's full history (all time, every store; test plays flagged) and the reminders they were sent
   router.get('/players/:email', wrap(async (req, res) => {
     const norm = normalizeEmail(req.params.email)?.norm || String(req.params.email).toLowerCase();
-    const { rows } = await q(`SELECT p.id, p.email, p.locale, p.created_at, p.email_status, p.email_error, p.email_attempts, p.is_test,
-        g.name AS game, g.type, s.name AS store, sg.name AS store_group,
-        (SELECT json_agg(json_build_object('title', pr.title, 'code', pr.code)) FROM play_rewards pr WHERE pr.play_id = p.id) AS rewards
-      ${BASE} WHERE p.email_norm = $1 ORDER BY p.created_at DESC`, [norm]);
-    res.json({ email_norm: norm, plays: rows });
-  }));
-
-  // ---------- email delivery
-  router.get('/deliveries', wrap(async (req, res) => {
-    const qs = await resolve(req.query); const r = parseRange(qs); const params = []; const w = scope(qs, params); w.push(inRange(params, r.from, r.to));
-    w.push(`p.email_status <> 'skipped'`); // losses send no email
-    if (['sent', 'failed', 'pending'].includes(qs.status)) { params.push(qs.status); w.push(`p.email_status = $${params.length}`); }
-    const page = Math.max(0, parseInt(qs.page, 10) || 0);
-    const [{ rows }, { rows: [c] }] = await Promise.all([
-      q(`SELECT p.id, p.email, p.locale, p.created_at, p.email_status, p.email_error, p.email_attempts, p.last_email_at, g.name AS game, s.name AS store,
-          (SELECT json_agg(json_build_object('title', pr.title, 'code', pr.code)) FROM play_rewards pr WHERE pr.play_id = p.id) AS rewards,
-          count(*) OVER ()::int AS total
-        ${BASE} ${where(w)} ORDER BY p.created_at DESC LIMIT 50 OFFSET ${page * 50}`, params),
-      (() => { const p2 = []; const w2 = scope(qs, p2); w2.push(inRange(p2, r.from, r.to));
-        return q(`SELECT count(*) FILTER (WHERE p.email_status = 'sent')::int AS sent, count(*) FILTER (WHERE p.email_status = 'failed')::int AS failed,
-          count(*) FILTER (WHERE p.email_status = 'pending')::int AS pending ${BASE} ${where(w2)}`, p2); })(),
+    const [{ rows }, { rows: reminders }] = await Promise.all([
+      q(`SELECT p.id, p.email, p.locale, p.created_at, p.is_test, g.name AS game, g.type, s.name AS store, sg.name AS store_group,
+          (SELECT json_agg(json_build_object('title', pr.title, 'code', pr.code)) FROM play_rewards pr WHERE pr.play_id = p.id) AS rewards
+        ${BASE} WHERE p.email_norm = $1 ORDER BY p.created_at DESC`, [norm]),
+      q(`SELECT r.id, r.status, r.error, r.week_key, r.created_at, r.sent_at, s.name AS store,
+          EXISTS (SELECT 1 FROM unsubscribes u WHERE u.store_id = r.store_id AND u.email_norm = r.email_norm) AS unsubscribed
+        FROM reminders r JOIN stores s ON s.id = r.store_id WHERE r.email_norm = $1 ORDER BY r.created_at DESC`, [norm]),
     ]);
-    res.json({ counts: c, total: rows[0]?.total || 0, page, pageSize: 50, rows });
+    res.json({ email_norm: norm, plays: rows, reminders });
   }));
 
-  // re-send a play's code email (same codes, same expiry as the original play week)
-  router.post('/plays/:id/resend', wrap(async (req, res) => {
+  // ---------- weekly reminder emails
+  router.get('/reminders', wrap(async (req, res) => {
+    const qs = await resolve(req.query); const r = parseRange(qs); const params = []; const w = rScope(qs, params, r.from, r.to);
+    if (['sent', 'failed', 'pending', 'skipped'].includes(qs.status)) { params.push(qs.status); w.push(`r.status = $${params.length}`); }
+    const page = Math.max(0, parseInt(qs.page, 10) || 0);
+    const up = []; const uw = rScope({ ...qs, game_id: '' }, up).map((x) => x.replace('r.store_id', 'u.store_id')); up.push(r.from, r.to);
+    const [{ rows }, counts, { rows: [u] }] = await Promise.all([
+      q(`SELECT r.id, r.email, r.locale, r.week_key, r.status, r.error, r.attempts, r.created_at, r.sent_at, g.name AS game, g.type, s.name AS store,
+          count(*) OVER ()::int AS total ${RBASE} ${where(w)} ORDER BY r.created_at DESC, r.email LIMIT 50 OFFSET ${page * 50}`, params),
+      reminderCounts(qs, r.from, r.to),
+      q(`SELECT count(*)::int AS n FROM unsubscribes u JOIN stores s ON s.id = u.store_id ${where([...uw, `u.created_at >= ${dayStart(up.length - 1)} AND u.created_at < ${dayEnd(up.length)}`])}`, up),
+    ]);
+    res.json({ counts: { ...counts, unsubscribed: u.n }, total: rows[0]?.total || 0, page, pageSize: 50, rows });
+  }));
+  // queue now and answer straight away; sending continues in the background (one every ~0.6 s)
+  router.post('/reminders/run', wrap(async (_req, res) => {
+    await new Promise((resolve, reject) => { runReminders({ onQueued: (r) => { res.json(r); resolve(); } }).catch((e) => (res.headersSent ? console.error('[reminders]', e) : reject(e))); });
+  }));
+  router.post('/reminders/:id/resend', wrap(async (req, res) => {
     if (!UUID.test(req.params.id)) return res.sendStatus(404);
-    const { rows: [p] } = await q(`SELECT p.*, g.id AS gid FROM plays p JOIN games g ON g.id = p.game_id WHERE p.id = $1`, [req.params.id]);
-    if (!p) return res.sendStatus(404);
-    const { rows: [game] } = await q(`SELECT g.*, sg.from_name AS group_from_name, sg.from_email AS group_from_email, sg.reply_to AS group_reply_to
-      FROM games g JOIN stores s ON s.id = g.store_id LEFT JOIN store_groups sg ON sg.id = s.group_id WHERE g.id = $1`, [p.game_id]);
-    const { rows: rewards } = await q('SELECT title, subtitle, code FROM play_rewards WHERE play_id = $1', [p.id]);
-    const weekStart = DateTime.fromISO(String(p.week_key).slice(0, 10), { zone: ZONE }).startOf('day');
-    const expiresAt = weekStart.plus({ weeks: 1 }).minus({ seconds: 1 }).toISO();
-    const mail = buildEmail({ game, rewards, locale: p.locale, expiresAt });
-    const r = await sendEmail({ game, to: p.email, mail });
-    await q(`UPDATE plays SET email_status = $2, email_error = $3, email_attempts = email_attempts + 1, last_email_at = now() WHERE id = $1`, [p.id, r.ok ? 'sent' : 'failed', r.ok ? null : r.error]);
-    res.json({ ok: r.ok, error: r.error || null });
+    const { rows: [rem] } = await q('SELECT * FROM reminders WHERE id = $1', [req.params.id]);
+    if (!rem) return res.sendStatus(404);
+    const r = await deliver(rem);
+    res.json({ ok: !!r.ok, error: r.error || null });
+  }));
+  // what a game's reminder looks like (sample unsubscribe link)
+  router.get('/reminders/preview', wrap(async (req, res) => {
+    if (!UUID.test(req.query.game_id || '')) return res.sendStatus(404);
+    const built = await reminderFor(req.query.game_id, req.query.locale === 'fr' ? 'fr' : 'en', null, null);
+    if (!built) return res.sendStatus(404);
+    res.json({ subject: built.mail.subject, html: built.mail.html, play_url: built.mail.text.match(/https?:\/\/\S+pg_play=1/)?.[0] || null });
   }));
 
   // ---------- filtered plays export (one row per reward won)
   router.get('/reports/plays.csv', wrap(async (req, res) => {
     const qs = await resolve(req.query); const r = parseRange(qs); const params = []; const w = scope(qs, params); w.push(inRange(params, r.from, r.to));
     if (UUID.test(qs.reward_id || '')) { params.push(qs.reward_id); w.push(`pr.reward_id = $${params.length}`); }
-    const { rows } = await q(`SELECT p.email, p.locale, p.created_at, p.email_status, g.name AS game, g.type, s.name AS store, sg.name AS store_group, pr.title, pr.code
+    const { rows } = await q(`SELECT p.email, p.locale, p.created_at, g.name AS game, g.type, s.name AS store, sg.name AS store_group, pr.title, pr.code
       ${BASE} JOIN play_rewards pr ON pr.play_id = p.id ${where(w)} ORDER BY p.created_at DESC`, params);
-    const head = 'email,store_group,store,game,game_type,reward,code,language,email_status,played_at_et';
-    const body = rows.map((x) => [x.email, x.store_group, x.store, x.game, x.type, x.title?.en, x.code, x.locale, x.email_status,
+    const head = 'email,store_group,store,game,game_type,reward,code,language,played_at_et';
+    const body = rows.map((x) => [x.email, x.store_group, x.store, x.game, x.type, x.title?.en, x.code, x.locale,
       DateTime.fromJSDate(x.created_at).setZone(ZONE).toFormat('yyyy-LL-dd HH:mm')].map(csvCell).join(','));
     res.type('text/csv').set('Content-Disposition', `attachment; filename="plays_${r.from}_${r.to}.csv"`).send([head, ...body].join('\n'));
   }));

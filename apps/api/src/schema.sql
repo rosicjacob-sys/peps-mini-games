@@ -113,3 +113,31 @@ CREATE TABLE IF NOT EXISTS reward_library (
 );
 ALTER TABLE rewards ADD COLUMN IF NOT EXISTS library_id uuid REFERENCES reward_library(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS rewards_library_idx ON rewards(library_id);
+
+-- weekly "play again" reminders (they replaced code emails): one per store + email + week,
+-- sent after the Monday reset to whoever played that store's games the week before
+CREATE TABLE IF NOT EXISTS reminders (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  store_id uuid NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  game_id uuid REFERENCES games(id) ON DELETE SET NULL,   -- the game they played; its sender and look are used
+  email text NOT NULL,
+  email_norm text NOT NULL,
+  locale text NOT NULL DEFAULT 'en',
+  week_key text NOT NULL,                                 -- the week the reminder invites them to play
+  status text NOT NULL DEFAULT 'pending',                 -- pending | sent | failed | skipped
+  error text,
+  attempts int NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  sent_at timestamptz,
+  UNIQUE (store_id, email_norm, week_key)
+);
+CREATE INDEX IF NOT EXISTS reminders_created_idx ON reminders(created_at DESC);
+CREATE INDEX IF NOT EXISTS reminders_email_idx ON reminders(email_norm);
+CREATE TABLE IF NOT EXISTS unsubscribes (
+  store_id uuid NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  email_norm text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (store_id, email_norm)
+);
+-- where the reminder's "Play now" button goes (falls back to the store's first allowed address)
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS site_url text;

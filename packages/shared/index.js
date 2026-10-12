@@ -19,6 +19,7 @@ export const GAME_TYPES = {
   scratch: { label: 'Scratch Card', icon: '🪙', category: 'arcade', defaultTheme: 'candy' },
   gifts: { label: 'Mystery Gift Boxes', icon: '🎁', category: 'arcade', defaultTheme: 'sunshine' },
   plinko: { label: 'Plinko', icon: '🔮', category: 'arcade', defaultTheme: 'ocean', maxRewards: 8 },
+  spin: { label: 'Lucky Spin', icon: '🌈', category: 'arcade', defaultTheme: 'candy' },
 };
 export const categoryOf = (type) => GAME_TYPES[type]?.category || 'casino';
 // game types that show each reward as an icon (picked per reward in the library)
@@ -94,7 +95,7 @@ export const UI = {
     start: 'Play now', sending: 'Please wait…', invalidEmail: 'Please enter a valid email address.',
     spin: 'SPIN', spinning: 'Spinning…', yourReward: 'You won!', yourRewards: 'You won!', congrats: 'Congratulations!',
     code: 'Your code', copy: 'Copy', copied: 'Copied!',
-    limited: 'Claim it soon: this offer is only available for a very limited time.', emailed: 'We also emailed this code to', close: 'Close', soundOn: 'Turn sound on', soundOff: 'Turn sound off',
+    limited: 'Claim it soon: this offer is only available for a very limited time.', close: 'Close', soundOn: 'Turn sound on', soundOff: 'Turn sound off',
     redeem: 'Enter this code in your cart to apply your reward.', spinHeading: 'Spin your reward',
     lose: { title: 'Not this time', retry: 'Try again on', promo: 'In the meantime, keep an eye on your inbox. We send new promotions every week.', cont: 'Continue', slice: 'Try again' },
     noMatch: 'No match',
@@ -116,7 +117,7 @@ export const UI = {
     start: 'Jouer', sending: 'Veuillez patienter…', invalidEmail: 'Veuillez entrer une adresse courriel valide.',
     spin: 'TOURNER', spinning: 'Rotation…', yourReward: 'Vous avez gagné!', yourRewards: 'Vous avez gagné!', congrats: 'Félicitations!',
     code: 'Votre code', copy: 'Copier', copied: 'Copié!',
-    limited: 'Profitez-en vite : cette offre n’est disponible que pour une durée très limitée.', emailed: 'Nous avons aussi envoyé ce code à', close: 'Fermer', soundOn: 'Activer le son', soundOff: 'Couper le son',
+    limited: 'Profitez-en vite : cette offre n’est disponible que pour une durée très limitée.', close: 'Fermer', soundOn: 'Activer le son', soundOff: 'Couper le son',
     redeem: 'Entrez ce code dans votre panier pour appliquer votre récompense.', spinHeading: 'Tournez pour votre récompense',
     lose: { title: 'Pas cette fois', retry: 'Réessayez le', promo: 'D’ici là, surveillez votre boîte de réception. Nous envoyons de nouvelles promotions chaque semaine.', cont: 'Continuer', slice: 'Réessayez' },
     noMatch: 'Pas de correspondance',
@@ -140,14 +141,14 @@ export const INTRO_DEFAULTS = {
   en: {
     heading: 'Play to Win!',
     description: 'Play a quick game for a chance to win exclusive discount codes, free gifts and other exciting rewards.',
-    steps: ['Enter your email address', 'Play the game', "Get your reward code instantly. We'll email it to you too"],
+    steps: ['Enter your email address', 'Play the game', 'Get your reward code instantly'],
     note: 'Rewards are only available for a very limited time. One play per email each week.',
     playLabel: 'Play now', declineLabel: 'No thanks',
   },
   fr: {
     heading: 'Jouez pour gagner!',
     description: 'Jouez à un jeu rapide pour courir la chance de gagner des codes de réduction exclusifs, des cadeaux gratuits et d’autres récompenses intéressantes.',
-    steps: ['Entrez votre adresse courriel', 'Jouez au jeu', 'Recevez votre code tout de suite. Nous vous l’envoyons aussi par courriel'],
+    steps: ['Entrez votre adresse courriel', 'Jouez au jeu', 'Recevez votre code tout de suite'],
     note: 'Les récompenses ne sont offertes que pour une durée très limitée. Une partie par adresse courriel chaque semaine.',
     playLabel: 'Jouer maintenant', declineLabel: 'Non merci',
   },

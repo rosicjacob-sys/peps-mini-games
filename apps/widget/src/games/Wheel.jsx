@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { UI, t, themeFor } from '@peps/shared';
+import { UI, t, themeFor, categoryOf, POPS } from '@peps/shared';
 import { sound } from '../sound.js';
 
 const R = 150;
@@ -36,9 +36,11 @@ function layoutLabel(text, maxLines) {
 export default function Wheel({ game, result, locale, onDone }) {
   const ui = UI[locale];
   const th = themeFor(game.type, game.theme);
+  // the arcade wheel (Lucky Spin): candy-bright slices with readable labels, white rim
+  const arcade = categoryOf(game.type) === 'arcade';
   // a standalone wheel that can lose gets a "Try again" slice; a lost play spins once onto it
   const LOSE = '__lose';
-  const slices = game.type === 'wheel' && game.canLose ? [...game.rewards, { id: LOSE, title: { en: ui.lose.slice, fr: ui.lose.slice }, lose: true }] : game.rewards;
+  const slices = ['wheel', 'spin'].includes(game.type) && game.canLose ? [...game.rewards, { id: LOSE, title: { en: ui.lose.slice, fr: ui.lose.slice }, lose: true }] : game.rewards;
   const targets = result.lost ? [LOSE] : result.rewards.map((r) => r.id);
   const n = slices.length;
   const step = 360 / n;
@@ -110,8 +112,8 @@ export default function Wheel({ game, result, locale, onDone }) {
     else setSpin(spin + 1);
   }
 
-  const rim = th.rim || th.accent;
-  const tones = th.wheel || th.slices;
+  const rim = arcade ? '#ffffff' : th.rim || th.accent;
+  const tones = arcade ? POPS.map((p) => p.bg) : th.wheel || th.slices;
   const pegs = Math.max(16, n * 4);
 
   return (
@@ -131,7 +133,9 @@ export default function Wheel({ game, result, locale, onDone }) {
         {slices.map((r, i) => {
           const a0 = i * step, a1 = (i + 1) * step;
           const [x0, y0] = polar(a0, R - 7), [x1, y1] = polar(a1, R - 7);
-          const fill = tones[(n % tones.length === 1 && i === n - 1) ? 1 : i % tones.length];
+          const k = (n % tones.length === 1 && i === n - 1) ? 1 : i % tones.length;
+          const fill = arcade && r.lose ? '#ece8f2' : tones[k];
+          const ink = !arcade ? th.text : r.lose ? '#4a4458' : POPS[k].fg;
           const mid = a0 + step / 2;
           const [tx, ty] = polar(mid, R * 0.57);
           const { lines, f } = layoutLabel(t(r.title, locale), maxLines);
@@ -139,7 +143,7 @@ export default function Wheel({ game, result, locale, onDone }) {
             <g key={r.id} className={r.id === wonId ? 'slice won' : 'slice'}>
               {n === 1 ? <circle cx={R} cy={R} r={R - 7} fill={fill} stroke={rim} strokeWidth="1.5" />
                 : <path d={`M${R},${R} L${x0},${y0} A${R - 7},${R - 7} 0 ${step > 180 ? 1 : 0} 1 ${x1},${y1} Z`} fill={fill} stroke={rim} strokeWidth="2.5" />}
-              <text x={tx} y={ty} fill={th.text} fontSize={f} fontWeight="800" letterSpacing=".06em" style={{ textTransform: 'uppercase' }} textAnchor="middle" dominantBaseline="middle"
+              <text x={tx} y={ty} fill={ink} fontSize={f} fontWeight="800" letterSpacing=".06em" style={{ textTransform: 'uppercase' }} textAnchor="middle" dominantBaseline="middle"
                 transform={`rotate(${mid - 90} ${tx} ${ty})`}>
                 {lines.map((l, j) => <tspan key={j} x={tx} dy={j === 0 ? `${-(lines.length - 1) * 0.55}em` : '1.1em'}>{l}</tspan>)}
               </text>
@@ -172,7 +176,7 @@ export default function Wheel({ game, result, locale, onDone }) {
         <circle cx={R} cy={R} r="29" fill={rim} stroke="rgba(0,0,0,.5)" strokeWidth="1.5" />
         <circle cx={R} cy={R} r="23" fill="var(--accent)" stroke="rgba(0,0,0,.35)" strokeWidth="1" />
         <circle cx={R} cy={R} r="23" fill="url(#pg-hub)" />
-        <text x={R} y={R + 1} fill={rim} fontSize="24" textAnchor="middle" dominantBaseline="middle" style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,.6))' }}>★</text>
+        <text x={R} y={R + 1} fill={arcade ? th.rim : rim} fontSize="24" textAnchor="middle" dominantBaseline="middle" style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,.6))' }}>★</text>
         </svg>
       </div>
       <button className="btn" disabled={spinning} onClick={go}>{spinning ? ui.spinning : targets.length > 1 ? `${ui.spin} (${spin + 1}/${targets.length})` : ui.spin}</button>

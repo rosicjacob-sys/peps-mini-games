@@ -19,7 +19,7 @@ function insights(o) {
   const g = o.by.group[0]; if (g && o.by.group.length > 1) out.push({ tone: 'info', text: `${g.key} drives ${pct(g.plays / k.plays)} of plays.` });
   const odd = oddsChecks(o.rewards)[0];
   if (odd) out.push({ tone: 'warn', text: `${tr(odd.title)} (${odd.game} · ${odd.store}) is landing ${pct(odd.actual, 1)} vs ${pct(odd.set, 1)} set. Check the odds.` });
-  if (k.failed) out.push({ tone: 'bad', text: `${fmtInt(k.failed)} code email${k.failed === 1 ? '' : 's'} failed to send. See Email delivery.`, link: 'delivery' });
+  if (k.failed) out.push({ tone: 'bad', text: `${fmtInt(k.failed)} reminder email${k.failed === 1 ? '' : 's'} failed to send. See Reminder emails.`, link: 'delivery' });
   const lostN = o.rewards.filter((r) => r.lost).reduce((a, r) => a + r.won, 0);
   if (lostN && k.plays) out.push({ tone: 'info', text: `${pct(lostN / k.plays)} of plays won nothing (${fmtInt(lostN)}).` });
   if (k.fr) out.push({ tone: 'info', text: `French: ${pct(k.fr / k.plays)} of plays.` });
@@ -89,7 +89,7 @@ export default function Overview({ scope, go }) {
               <LanguageSplit rows={o.by.locale} total={o.kpis.plays} />
             </section>
             <section className="card">
-              <header className="card-head"><div><h2>Code email delivery</h2><p className="muted small">Sent ÷ (sent + failed)</p></div>
+              <header className="card-head"><div><h2>Reminder emails</h2><p className="muted small">Weekly "play again" emails delivered: sent ÷ (sent + failed)</p></div>
                 {go && <button className="ghost small" onClick={() => go('delivery')}>Details</button>}</header>
               <Meter value={o.kpis.sent + o.kpis.failed ? o.kpis.sent / (o.kpis.sent + o.kpis.failed) : 1} label={`${fmtInt(o.kpis.sent)} sent · ${fmtInt(o.kpis.failed)} failed · ${fmtInt(o.kpis.pending)} pending`} />
             </section>
@@ -128,7 +128,7 @@ function Kpis({ o }) {
       <StatTile label="New players" value={fmtInt(k.new_players)} delta={change(k.new_players, p.new_players)} spark={s.map((x) => x.new_players)} hint="Their first play ever (within the filters) is in this range" />
       <StatTile label="Returning players" value={pct(ret(k))} delta={change(ret(k), ret(p))} spark={s.map((x) => (x.players ? x.returning / x.players : 0))} hint="Share of players who had played before" />
       <StatTile label="Plays per player" value={fmt1(per(k))} delta={change(per(k), per(p))} hint="Plays ÷ unique players" />
-      <StatTile label="Email delivery" value={pct(rate(k), 1)} delta={change(rate(k), rate(p))} hint="Code emails sent ÷ (sent + failed)" />
+      <StatTile label="Reminders delivered" value={pct(rate(k), 1)} delta={change(rate(k), rate(p))} hint="Weekly reminder emails sent ÷ (sent + failed)" />
     </div>
   );
 }

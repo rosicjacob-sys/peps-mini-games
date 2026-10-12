@@ -131,6 +131,8 @@ function chip(m, at, d, v = 0.06, { slide, vib = 0, type = 'square' } = {}) {
   o.connect(f); f.connect(g); g.connect(fxBus); o.start(t); o.stop(t + d + 0.05);
 }
 const ARCADE_FX = {
+  // the arcade wheel landing: a bright two-note blip
+  ding() { chip(84, 0, 0.08, 0.05); chip(91, 0.08, 0.3, 0.05, { vib: 0.01 }); },
   // power-up: a quick climbing arpeggio, a held top note with vibrato, and a coin blip
   win() {
     [72, 76, 79, 84, 88, 91].forEach((m, k) => chip(m, k * 0.045, 0.06, 0.055));

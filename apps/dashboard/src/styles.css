@@ -335,3 +335,10 @@ button.primary-outline { border-color: var(--primary); font-weight: 650; }
 .pick-row .lib-text { flex: 1; } .pick-row code { margin-left: 0; }
 .pick-row:hover { background: var(--surface-2); } .pick-row.on { border-color: var(--s1); box-shadow: 0 0 0 1px var(--s1); }
 .pick-row.used { opacity: .55; cursor: default; } .pick-row .pill { margin-left: 0; }
+
+.drawer-sub { font-size: 14px; margin: 18px 0 8px; }
+.rem-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rem-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.pill.skipped { opacity: .75; }
+.reminder-preview { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.email-frame { width: 100%; max-width: 640px; height: 520px; border: 1px solid var(--line); border-radius: 12px; background: #f4f4f6; }

@@ -63,7 +63,7 @@ function Rewards({ game, reload }) {
   }
   return (
     <>
-      <p className="muted">Each play, the server picks {singleReward(game.type) ? 1 : game.rewards_per_play} reward{game.type === 'wheel' && game.rewards_per_play > 1 ? 's' : ''} using these probabilities.{game.type === 'slots' && ' All three reels stop on the winning reward\'s symbol.'}{game.type === 'poker' && ' Each reward is paid on a poker hand: the more likely the reward, the weaker the hand.'}{game.type === 'color' && ' Each active reward sits on one of six colours, in this order.'}{['lucky9', 'baccarat'].includes(game.type) && ' The player wins the hand, then spins a wheel; these probabilities decide where it lands.'}{game.type === 'blackjack' && ' The player wins a warm-up hand, then spins a wheel; these probabilities decide where the wheel lands.'}{game.type === 'scratch' && ' The card has 6 spots showing reward icons; three matching icons win that reward. Pick each reward\'s icon in the library.'}{game.type === 'gifts' && ' The player picks one of three boxes; it holds the reward chosen here, and the other boxes show what else was possible.'}{game.type === 'plinko' && ' The ball always lands in a slot for the reward chosen here. Rewards (and "Try again" if the player can lose) share the 9 slots, shown by their library icon.'} Active rewards must add up to 100%. Codes must already exist in your discount app.</p>
+      <p className="muted">Each play, the server picks {singleReward(game.type) ? 1 : game.rewards_per_play} reward{game.type === 'wheel' && game.rewards_per_play > 1 ? 's' : ''} using these probabilities.{game.type === 'slots' && ' All three reels stop on the winning reward\'s symbol.'}{game.type === 'poker' && ' Each reward is paid on a poker hand: the more likely the reward, the weaker the hand.'}{game.type === 'color' && ' Each active reward sits on one of six colours, in this order.'}{['lucky9', 'baccarat'].includes(game.type) && ' The player wins the hand, then spins a wheel; these probabilities decide where it lands.'}{game.type === 'blackjack' && ' The player wins a warm-up hand, then spins a wheel; these probabilities decide where the wheel lands.'}{game.type === 'scratch' && ' The card has 6 spots showing reward icons; three matching icons win that reward. Pick each reward\'s icon in the library.'}{game.type === 'gifts' && ' The player picks one of three boxes; it holds the reward chosen here, and the other boxes show what else was possible.'}{game.type === 'spin' && ' A bright arcade prize wheel: the server picks one reward with these probabilities and the wheel lands on it.'}{game.type === 'plinko' && ' The ball always lands in a slot for the reward chosen here. Rewards (and "Try again" if the player can lose) share the 9 slots, shown by their library icon.'} Active rewards must add up to 100%. Codes must already exist in your discount app.</p>
       {rows.map((r, i) => (
         <div key={r.id || i} className={`card reward-row linked ${r.active ? '' : 'off'}`}>
           <div className="linked-head">
@@ -126,6 +126,26 @@ function SoundEditor({ value, onChange }) {
   );
 }
 
+// what this game's reminder email looks like (as saved), in English or French
+function ReminderPreview({ gameId }) {
+  const [locale, setLocale] = useState(null); const [p, setP] = useState(null); const [err, setErr] = useState('');
+  useEffect(() => { if (!locale) return; setP(null); setErr(''); api.previewReminder(gameId, locale).then(setP).catch((e) => setErr(e.message)); }, [locale, gameId]);
+  return (
+    <div className="reminder-preview">
+      <div className="row"><span className="muted">Preview the email (as saved):</span>
+        <button className={locale === 'en' ? 'primary small' : 'ghost small'} onClick={() => setLocale(locale === 'en' ? null : 'en')}>English</button>
+        <button className={locale === 'fr' ? 'primary small' : 'ghost small'} onClick={() => setLocale(locale === 'fr' ? null : 'fr')}>French</button></div>
+      {err && <p className="error">{err}</p>}
+      {locale && p && (
+        <>
+          <p className="small"><b>Subject:</b> {p.subject}{!p.play_url && <span className="bad"> · No store website set: the email has no "Play now" button. Add it on the Stores page.</span>}</p>
+          <iframe title="Reminder email preview" className="email-frame" srcDoc={p.html} sandbox="" />
+        </>
+      )}
+    </div>
+  );
+}
+
 function Settings({ game, reload, section, back }) {
   const [g, setG] = useState({ ...game, texts: { heading: {}, subheading: {}, privacy: {}, triggerLabel: {}, privacyUrl: '', ...game.texts } });
   const [msg, setMsg] = useState(''); const [err, setErr] = useState('');
@@ -179,9 +199,11 @@ function Settings({ game, reload, section, back }) {
           <Loc label="Button label" value={g.texts.triggerLabel} onChange={(v) => setT('triggerLabel', v)} ph="Play & Win" />
           <Loc label="Heading" value={g.texts.heading} onChange={(v) => setT('heading', v)} ph="Spin to win" />
           <Loc label="Sub-heading" value={g.texts.subheading} onChange={(v) => setT('subheading', v)} ph="Enter your email to play" />
-          <Loc label="Privacy notice" rows="3" value={g.texts.privacy} onChange={(v) => setT('privacy', v)} ph="We'll email your code to this address." />
+          <Loc label="Privacy notice" rows="3" value={g.texts.privacy} onChange={(v) => setT('privacy', v)} ph="We'll use this email to send you a reminder when you can play again. Unsubscribe anytime." />
           <label>Privacy policy URL<input value={g.texts.privacyUrl} onChange={(e) => setT('privacyUrl', e.target.value)} placeholder="https://…/policies/privacy-policy" /></label>
-          <h3>Code email (sent via Resend)</h3>
+          <h3>Weekly reminder email (sent via Resend)</h3>
+          <p className="muted">Codes are shown on screen only. After each Monday 12:00 AM ET reset, players who played this store's games the week before get one email inviting them to play again (with an unsubscribe link). Each email can play once per week across all of the store's games; a different email can play again.</p>
+          <label className="check"><input type="checkbox" checked={g.texts.reminder?.enabled !== false} onChange={(e) => setT('reminder', { ...(g.texts.reminder || {}), enabled: e.target.checked })} /> Send the weekly reminder to this game's players</label>
           <div className="row">
             <label className="grow">From name<input value={g.from_name} onChange={(e) => setG({ ...g, from_name: e.target.value })} placeholder="Lexar Canada" /></label>
             <label className="grow">From email<input type="email" value={g.from_email} onChange={(e) => setG({ ...g, from_email: e.target.value })} placeholder="rewards@yourdomain.com" /></label>
@@ -190,11 +212,11 @@ function Settings({ game, reload, section, back }) {
           <p className="muted">
             {game.effective_sender?.source === 'game' && <>Sending as <b>{game.effective_sender.from_name} &lt;{game.effective_sender.from_email}&gt;</b> (set on this game).</>}
             {game.effective_sender?.source === 'group' && <>Blank, so sending as <b>{game.effective_sender.from_name} &lt;{game.effective_sender.from_email}&gt;</b>, the default of store group "{game.group_name}". Fill these in to override.</>}
-            {game.effective_sender?.source === 'none' && <b className="bad">No sender set: code emails will not be sent. Set one here or on the store group.</b>}
+            {game.effective_sender?.source === 'none' && <b className="bad">No sender set: reminder emails will not be sent. Set one here or on the store group.</b>}
             {' '}The from-address domain must be verified in your Resend account.
           </p>
-          <Loc label="Email subject" value={g.email_subject} onChange={(v) => setG({ ...g, email_subject: v })} ph="Your reward code" />
-          <p className="muted">Every code email tells players the offer is only available for a very limited time. Each email can play once per week across all of the store's games (resets Monday 12:00 AM ET); a different email can play again.</p>
+          <Loc label="Email subject" value={g.email_subject} onChange={(v) => setG({ ...g, email_subject: v })} ph="A new week, a new chance to win!" />
+          <ReminderPreview gameId={g.id} />
         </>
       )}
       <div className="row">
