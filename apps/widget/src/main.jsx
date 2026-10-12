@@ -25,7 +25,10 @@ export function mount({ store = '', api, locale, game, ageSelector, introPages, 
   const host = document.createElement('div');
   // the version marker the dashboard's "Check install" looks for (this build supports the shared, keyless line)
   host.setAttribute('data-peps-games', 'pg-groups-v1');
-  document.body.appendChild(host);
+  // Themes hide stray divs under <body> (one store's stylesheet set display:none on it) and some animate <body>,
+  // which breaks position:fixed inside it. The host goes on <html> instead, with its own display pinned inline.
+  for (const [k, v] of [['display', 'block'], ['visibility', 'visible'], ['opacity', '1'], ['position', 'static'], ['width', '0'], ['height', '0'], ['overflow', 'visible']]) host.style.setProperty(k, v, 'important');
+  document.documentElement.appendChild(host);
   const shadow = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = css;
