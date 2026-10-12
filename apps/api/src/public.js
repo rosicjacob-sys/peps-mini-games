@@ -41,7 +41,8 @@ publicRouter.get('/config', async (req, res) => {
     const { rows: rewards } = await q('SELECT id, title, subtitle, symbol, probability, sort FROM rewards WHERE game_id = $1 AND active ORDER BY sort, id', [g.id]);
     if (rewards.length) out.push(publicGame(g, rewards));
   }
-  res.set('Cache-Control', 'public, max-age=60').json({ games: out });
+  // never reuse an old list: pausing a game in the dashboard must take effect on the next page load
+  res.set('Cache-Control', 'no-cache').json({ games: out });
 });
 
 // One play per email per game per ET week. The server rolls the outcome; the widget only animates it.
