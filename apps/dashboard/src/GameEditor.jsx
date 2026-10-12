@@ -14,7 +14,7 @@ export default function GameEditor({ id, back }) {
   return (
     <>
       <button className="link back" onClick={back}>← All games</button>
-      <div className="page-head"><div><h1>{game.name}</h1><p className="muted">{GAME_TYPES[game.type]?.label} · {game.store_name}{game.group_name ? ` · ${game.group_name}` : ''} · <span className={`pill ${game.status}`}>{game.status === 'active' ? 'Live' : 'Paused'}</span></p></div></div>
+      <div className="page-head"><div><h1>{game.name}</h1><p className="muted">{GAME_TYPES[game.type]?.label} · group <b>{game.group_name}</b>, shown on {game.store_names?.length ? game.store_names.join(', ') : 'no stores yet'} · <span className={`pill ${game.status}`}>{game.status === 'active' ? 'Live' : 'Paused'}</span></p></div></div>
       <div className="tabs">{TABS.map((x) => <button key={x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{x}</button>)}</div>
       {tab === 'Rewards' && <Rewards game={game} reload={load} />}
       {tab === 'Stats' && <Overview scope={scope} />}

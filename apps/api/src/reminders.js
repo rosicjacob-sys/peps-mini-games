@@ -23,12 +23,17 @@ export function playUrl(store) {
   try { const u = new URL(base); u.searchParams.set('pg_play', '1'); return u.toString(); } catch { return null; }
 }
 
-const GAME_SQL = `SELECT g.*, s.name AS store_name, s.site_url, s.allowed_origins,
+// the game (look, subject, sender with its group's defaults) and the store the player played on (name and link);
+// without a store (the dashboard preview) the group's first store is used
+const GAME_SQL = `SELECT g.*, s.id AS store_id, s.name AS store_name, s.site_url, s.allowed_origins,
     sg.from_name AS group_from_name, sg.from_email AS group_from_email, sg.reply_to AS group_reply_to
-  FROM games g JOIN stores s ON s.id = g.store_id LEFT JOIN store_groups sg ON sg.id = s.group_id WHERE g.id = $1`;
+  FROM games g LEFT JOIN store_groups sg ON sg.id = g.group_id
+  LEFT JOIN LATERAL (SELECT * FROM stores x WHERE ($2::uuid IS NOT NULL AND x.id = $2) OR ($2::uuid IS NULL AND x.group_id = g.group_id)
+    ORDER BY x.created_at LIMIT 1) s ON true
+  WHERE g.id = $1`;
 
 export async function reminderFor(gameId, locale, storeId, norm) {
-  const { rows: [game] } = await q(GAME_SQL, [gameId]);
+  const { rows: [game] } = await q(GAME_SQL, [gameId, storeId || null]);
   if (!game) return null;
   return { game, mail: buildReminder({ game, locale, playUrl: playUrl(game), unsubUrl: norm ? unsubUrl(storeId, norm) : null }) };
 }
@@ -38,7 +43,7 @@ export async function deliver(rem) {
   const skip = async (why) => { await q(`UPDATE reminders SET status = 'skipped', error = $2 WHERE id = $1`, [rem.id, why]); return { ok: false, skipped: true, error: why }; };
   const { rows: [why] } = await q(`SELECT
       EXISTS (SELECT 1 FROM unsubscribes u WHERE u.store_id = $1 AND u.email_norm = $2) AS unsub,
-      EXISTS (SELECT 1 FROM plays p JOIN games g ON g.id = p.game_id WHERE g.store_id = $1 AND p.email_norm = $2 AND p.week_key = $3) AS played`,
+      EXISTS (SELECT 1 FROM plays p WHERE p.store_id = $1 AND p.email_norm = $2 AND p.week_key = $3) AS played`,
     [rem.store_id, rem.email_norm, rem.week_key]);
   if (why.unsub) return skip('Unsubscribed');
   if (why.played) return skip('Already played again this week');
@@ -54,13 +59,13 @@ export async function deliver(rem) {
 // queue: one reminder per store + email that played last week (their latest game there decides sender and look)
 async function queue(db, w) {
   const ins = await db.query(`INSERT INTO reminders (store_id, game_id, email, email_norm, locale, week_key)
-    SELECT DISTINCT ON (g.store_id, p.email_norm) g.store_id, p.game_id, p.email, p.email_norm, p.locale, $2
+    SELECT DISTINCT ON (p.store_id, p.email_norm) p.store_id, p.game_id, p.email, p.email_norm, p.locale, $2
     FROM plays p JOIN games g ON g.id = p.game_id
-    WHERE p.week_key = $1 AND NOT p.is_test
+    WHERE p.week_key = $1 AND NOT p.is_test AND p.store_id IS NOT NULL
       AND coalesce((g.texts->'reminder'->>'enabled')::boolean, true)
-      AND EXISTS (SELECT 1 FROM games a WHERE a.store_id = g.store_id AND a.status = 'active')
-      AND NOT EXISTS (SELECT 1 FROM unsubscribes u WHERE u.store_id = g.store_id AND u.email_norm = p.email_norm)
-    ORDER BY g.store_id, p.email_norm, p.created_at DESC
+      AND EXISTS (SELECT 1 FROM stores st JOIN games a ON a.group_id = st.group_id WHERE st.id = p.store_id AND a.status = 'active')
+      AND NOT EXISTS (SELECT 1 FROM unsubscribes u WHERE u.store_id = p.store_id AND u.email_norm = p.email_norm)
+    ORDER BY p.store_id, p.email_norm, p.created_at DESC
     ON CONFLICT (store_id, email_norm, week_key) DO NOTHING`, [w.prevWeekKey, w.weekKey]);
   return ins.rowCount;
 }

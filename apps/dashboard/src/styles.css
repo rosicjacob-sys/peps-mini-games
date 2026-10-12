@@ -342,3 +342,6 @@ button.primary-outline { border-color: var(--primary); font-weight: 650; }
 .pill.skipped { opacity: .75; }
 .reminder-preview { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .email-frame { width: 100%; max-width: 640px; height: 520px; border: 1px solid var(--line); border-radius: 12px; background: #f4f4f6; }
+
+.install-shared h2 { font-size: 15px; margin: 0 0 10px; }
+.store-games { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }

@@ -141,3 +141,15 @@ CREATE TABLE IF NOT EXISTS unsubscribes (
 );
 -- where the reminder's "Play now" button goes (falls back to the store's first allowed address)
 ALTER TABLE stores ADD COLUMN IF NOT EXISTS site_url text;
+
+-- games belong to a store group: every store in the group shows them (set up once, no per-store setup)
+ALTER TABLE games ADD COLUMN IF NOT EXISTS group_id uuid REFERENCES store_groups(id);
+ALTER TABLE games ALTER COLUMN store_id DROP NOT NULL;   -- legacy: the store a game was first made for
+CREATE INDEX IF NOT EXISTS games_group_idx ON games(group_id);
+-- a play remembers the store it happened on (games are shared by the group's stores)
+ALTER TABLE plays ADD COLUMN IF NOT EXISTS store_id uuid REFERENCES stores(id) ON DELETE CASCADE;
+UPDATE plays p SET store_id = g.store_id FROM games g WHERE p.store_id IS NULL AND g.id = p.game_id AND g.store_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS plays_store_week_idx ON plays(store_id, email_norm, week_key);
+-- one play per email per *store* per week is enforced in /play (under a lock); the old per-game rule would wrongly
+-- block the same game on a second store of the group
+ALTER TABLE plays DROP CONSTRAINT IF EXISTS plays_game_id_email_norm_week_key_key;

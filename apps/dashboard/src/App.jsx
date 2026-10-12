@@ -91,9 +91,9 @@ function Login({ onDone }) {
 
 function Games({ open }) {
   const f = useFilters();
-  const [games, setGames] = useState(null); const [stores, setStores] = useState([]);
-  const [form, setForm] = useState({ store_id: '', type: 'wheel' }); const [err, setErr] = useState(''); const [q, setQ] = useState('');
-  const load = () => { api.games().then(setGames); api.stores().then((s) => { setStores(s); setForm((x) => ({ ...x, store_id: x.store_id || s[0]?.id || '' })); }); };
+  const [games, setGames] = useState(null); const [groups, setGroups] = useState([]);
+  const [form, setForm] = useState({ group_id: '', type: 'wheel' }); const [err, setErr] = useState(''); const [q, setQ] = useState('');
+  const load = () => { api.games().then(setGames); api.groups().then((gs) => { setGroups(gs); setForm((x) => ({ ...x, group_id: x.group_id || gs[0]?.id || '' })); }); };
   useEffect(load, []);
   async function create(e) {
     e.preventDefault(); setErr('');
@@ -102,14 +102,14 @@ function Games({ open }) {
   async function toggle(g) {
     await api.updateGame(g.id, { ...g, status: g.status === 'active' ? 'paused' : 'active' }); load(); f.reloadLists();
   }
-  const list = (games || []).filter((g) => !q || `${g.name} ${g.store_name} ${g.group_name || ''}`.toLowerCase().includes(q.toLowerCase()));
+  const list = (games || []).filter((g) => !q || `${g.name} ${g.group_name || ''}`.toLowerCase().includes(q.toLowerCase()));
   return (
     <>
-      <PageHead title="Games" sub="Every game on every store. Open one to edit rewards, odds, copy and look." />
-      {stores.length === 0 && games && <div className="alert info">Create a store first (Stores), then add games to it.</div>}
-      {stores.length > 0 && (
+      <PageHead title="Games" sub="Games are set up per store group: every store in the group shows them, so a new store needs no setup. Open a game to edit rewards, odds, copy and look." />
+      {groups.length === 0 && games && <div className="alert info">Create a store group first (Store groups), then add games to it.</div>}
+      {groups.length > 0 && (
         <form className="card toolbar-card" onSubmit={create}>
-          <label>Store<select value={form.store_id} onChange={(e) => setForm({ ...form, store_id: e.target.value })}>{stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+          <label>Store group<select value={form.group_id} onChange={(e) => setForm({ ...form, group_id: e.target.value })}>{groups.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.store_count} store{g.store_count === 1 ? '' : 's'})</option>)}</select></label>
           <label>Game type<select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
             {Object.entries(CATEGORIES).map(([c, cat]) => (
               <optgroup key={c} label={`${cat.icon} ${cat.label.en}`}>
@@ -138,7 +138,7 @@ function Games({ open }) {
                 <span className="gc-text">
                   <b>{g.name}</b>
                   <span className="muted small">{GAME_TYPES[g.type]?.label} · {th.label}</span>
-                  <span className="small">{g.store_name}{g.group_name ? <span className="muted"> · {g.group_name}</span> : null}</span>
+                  <span className="small">{g.group_name}<span className="muted"> · {g.store_count} store{g.store_count === 1 ? '' : 's'}</span></span>
                 </span>
               </button>
               <div className="gc-foot">
@@ -168,8 +168,9 @@ function Stores() {
   useEffect(() => { load(); }, []);
   return (
     <>
-      <PageHead title="Stores" sub="Your Shopify stores. Install each one once, then manage its games from Games."
+      <PageHead title="Stores" sub="Your Shopify stores. A store shows the games of its store group, so adding a store needs no game setup: pick its group, add its website, paste the install line."
         actions={!adding && <button className="primary" onClick={() => setAdding(true)}>+ Add store</button>} />
+      <InstallLine />
       {adding && <StoreForm groups={groups} onCancel={() => setAdding(false)} onSaved={() => { setAdding(false); load(); }} />}
       <div className="store-list">
         {stores?.map((s) => <StoreCard key={s.id} s={s} groups={groups} reload={load} />)}
@@ -201,14 +202,14 @@ function StoreForm({ s, groups, onCancel, onSaved, onDelete }) {
       <div className="form-grid">
         <label>Store name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Lexar Canada" autoFocus={!s} /></label>
         <label>Store group<select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-          <option value="">No group</option>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
-          <span className="help">Reminder emails use the group's sender address. <a href="#/groups">Manage groups</a></span></label>
+          <option value="">No group (no games)</option>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
+          <span className="help">The store shows its group's games and uses the group's sender address. <a href="#/groups">Manage groups</a></span></label>
         <label className="span-2"><span>Link in reminder emails <span className="optional">recommended</span></span>
           <input value={siteUrl} onChange={(e) => setSiteUrl(e.target.value)} placeholder="https://lexarcanada.ca" />
           <span className="help">Where the weekly reminder's "Play now" button goes (usually your homepage); the game opens by itself when they arrive. Blank: the first allowed website below.</span></label>
-        <label className="span-2"><span>Allowed websites <span className="optional">optional</span></span>
+        <label className="span-2"><span>Store website(s)</span>
           <textarea rows="2" value={sites} onChange={(e) => setSites(e.target.value)} placeholder="https://lexarcanada.ca" />
-          <span className="help">Only these addresses can load the games. This stops other sites copying your install code. Add one per line (include the www. version if your store uses it). Leave empty while testing.</span></label>
+          <span className="help">The shared install line finds this store by these addresses, and only they can load its games. Add one per line (include the www. version if your store uses it). Each address can belong to one store.</span></label>
       </div>
       {err && <p className="error">{err}</p>}
       <div className="form-actions">
@@ -220,12 +221,32 @@ function StoreForm({ s, groups, onCancel, onSaved, onDelete }) {
   );
 }
 
+// The install line is the same for every store: the widget is recognised by the store's website.
+const SHARED_LINE = `<script src="${WIDGET_URL}" data-locale="{{ request.locale.iso_code }}" charset="utf-8" defer></script>`;
+function CopyLine({ line }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => navigator.clipboard?.writeText(line).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  return <div className="snippet"><code>{line}</code><button className="primary small" onClick={copy}>{copied ? 'Copied ✓' : 'Copy'}</button></div>;
+}
+function InstallLine() {
+  return (
+    <section className="card install-shared">
+      <h2>Install line (the same for every store)</h2>
+      <ol className="steps-list">
+        <li><b>Copy it</b><CopyLine line={SHARED_LINE} /></li>
+        <li><b>Paste it into <code>layout/theme.liquid</code></b><span className="muted">Online Store → Themes → ⋯ → Edit code, just above the closing <code>&lt;/body&gt;</code> tag, then Save. Once per store; game changes made here go live automatically.</span></li>
+        <li><b>List the store's website below</b><span className="muted">The line finds the store by its address (add both <code>https://yourstore.com</code> and the <code>www.</code> version if used).</span></li>
+      </ol>
+    </section>
+  );
+}
+
 function StoreCard({ s, groups, reload }) {
   const [mode, setMode] = useState(null); // null | 'edit' | 'install'
-  const [copied, setCopied] = useState(false);
-  const snippet = `<script src="${WIDGET_URL}" data-store="${s.public_key}" data-locale="{{ request.locale.iso_code }}" charset="utf-8" defer></script>`;
-  const copy = () => navigator.clipboard?.writeText(snippet).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
-  const del = async () => { if (confirm(`Delete "${s.name}"? Its ${s.game_count} game(s), rewards and play history will be removed. This cannot be undone.`)) { await api.deleteStore(s.id); reload(); } };
+  // stores without a website listed need the store's own key in the line
+  const keyed = `<script src="${WIDGET_URL}" data-store="${s.public_key}" data-locale="{{ request.locale.iso_code }}" charset="utf-8" defer></script>`;
+  const live = s.games.filter((g) => g.status === 'active');
+  const del = async () => { if (confirm(`Delete "${s.name}"? Its play history will be removed (its group's games stay). This cannot be undone.`)) { await api.deleteStore(s.id); reload(); } };
   return (
     <article className="card store-card">
       <div className="store-head">
@@ -234,9 +255,13 @@ function StoreCard({ s, groups, reload }) {
           <div>
             <h2>{s.name}</h2>
             <div className="store-meta">
-              {s.group_name ? <span className="pill">{s.group_name}</span> : <span className="pill">No group</span>}
-              <span>{s.game_count} game{s.game_count === 1 ? '' : 's'}</span>
-              <span className="muted">{s.allowed_origins.length ? s.allowed_origins.join(', ') : 'Any website (not locked)'}</span>
+              {s.group_name ? <span className="pill">{s.group_name}</span> : <span className="pill failed">No group: no games show</span>}
+              <span className="muted">{s.allowed_origins.length ? s.allowed_origins.join(', ') : 'No website listed'}</span>
+            </div>
+            <div className="store-games">
+              {s.group_name && (live.length
+                ? <><span className="muted small">Shows {live.length} game{live.length === 1 ? '' : 's'} from {s.group_name}:</span> {live.map((g) => <span key={g.id} className="pill">{GAME_TYPES[g.type]?.icon} {g.name}</span>)}</>
+                : <span className="muted small">{s.group_name} has no live games yet. Add them on the Games page.</span>)}
             </div>
           </div>
         </div>
@@ -248,8 +273,10 @@ function StoreCard({ s, groups, reload }) {
       {mode === 'install' && (
         <div className="install">
           <ol className="steps-list">
-            <li><b>Copy the install code</b>
-              <div className="snippet"><code>{snippet}</code><button className="primary small" onClick={copy}>{copied ? 'Copied ✓' : 'Copy'}</button></div></li>
+            <li><b>Copy the install line</b>
+              {s.allowed_origins.length ? <CopyLine line={SHARED_LINE} /> : (
+                <><span className="muted">This store has no website listed, so it needs its own line (with its key). Or add its website (Edit) and use the shared line above.</span><CopyLine line={keyed} /></>
+              )}</li>
             <li><b>Open the theme code in Shopify</b><span className="muted">Online Store → Themes → ⋯ (next to your theme) → Edit code</span></li>
             <li><b>Paste it into <code>layout/theme.liquid</code></b><span className="muted">just above the closing <code>&lt;/body&gt;</code> tag, then Save. Do this once: game changes made here go live automatically.</span></li>
           </ol>
@@ -266,7 +293,7 @@ function Groups() {
   const load = () => api.groups().then(setGroups); useEffect(() => { load(); }, []);
   return (
     <>
-      <PageHead title="Store groups" sub="Group your stores (e.g. Lexar, Can Peps, Peps USA). A group's From address is used by every game in its stores unless the game sets its own. Each From domain must be verified in Resend." />
+      <PageHead title="Store groups" sub="Group your stores (e.g. Lexar, Can Peps, Peps USA). Games are set up per group: every store in a group shows its games. A group's From address is used by its games unless a game sets its own. Each From domain must be verified in Resend." />
       <form className="card row" onSubmit={async (e) => { e.preventDefault(); if (!name.trim()) return; await api.createGroup({ name }); setName(''); load(); }}>
         <label>Group name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Lexar" /></label><button className="primary">+ Add group</button>
       </form>
@@ -283,7 +310,7 @@ function GroupCard({ g, reload }) {
     <div className="card">
       <div className="row">
         <label className="grow">Name<input value={f.name} onChange={set('name')} /></label>
-        <span className="muted">{g.store_count} store{g.store_count === 1 ? '' : 's'}</span>
+        <span className="muted">{g.store_count} store{g.store_count === 1 ? '' : 's'} · {g.game_count} game{g.game_count === 1 ? '' : 's'}</span>
       </div>
       <h3>Default sender for code emails</h3>
       <div className="row">
@@ -293,7 +320,7 @@ function GroupCard({ g, reload }) {
       </div>
       <div className="row">
         <button className="primary" onClick={async () => { await api.updateGroup(g.id, f); setMsg('Saved'); reload(); }}>Save</button>
-        <button className="danger" onClick={async () => { if (confirm(`Delete group "${g.name}"? Its stores are kept and become ungrouped.`)) { await api.deleteGroup(g.id); reload(); } }}>Delete</button>
+        <button className="danger" onClick={async () => { if (confirm(`Delete group "${g.name}"? Its stores are kept and become ungrouped (they show no games until they join another group).`)) { try { await api.deleteGroup(g.id); reload(); } catch (e) { alert(e.message); } } }}>Delete</button>
         <span className="good">{msg}</span>
       </div>
     </div>
