@@ -1,0 +1,30 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: peps
+          POSTGRES_PASSWORD: peps
+          POSTGRES_DB: peps_games_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U peps" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: API tests (unit + integration against Postgres)
+        run: npm test -w @peps/api
+        env:
+          TEST_DATABASE_URL: postgres://peps:peps@localhost:5432/peps_games_test
+      - name: Build dashboard and widget
+        run: npm run build:dashboard && npm run build:widget
