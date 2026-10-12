@@ -7,6 +7,13 @@
 .trigger::after { content: ""; position: absolute; top: -40%; left: -60%; width: 40%; height: 180%; transform: rotate(20deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: shine 3.2s ease-in-out infinite; }
 .trigger:hover { filter: brightness(1.08); }
 .trigger-suit { color: var(--suit, var(--rim)); font-size: 18px; line-height: 1; }
+/* after a play this week: quieter, says when to come back (a different email can still play) */
+.trigger.played { background: var(--surface); color: var(--text); border-color: var(--border); box-shadow: 0 8px 22px rgba(0,0,0,.3); }
+.trigger.played::after { animation: none; }
+.trigger.played .trigger-suit { color: var(--rim); }
+.pg-arcade .trigger.played { background: #fff; color: var(--text); border-color: var(--border); }
+.preview-tag { position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: #111; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: 3px 10px; border-radius: 0 0 8px 8px; z-index: 4; white-space: nowrap; }
+.modal:focus { outline: none; }
 @keyframes shine { 0%, 60% { left: -60%; } 100% { left: 130%; } }
 .overlay { position: fixed; inset: 0; z-index: 2147483001; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .modal { position: relative; width: 100%; max-width: 420px; max-height: 92vh; max-height: 92dvh; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; color: var(--text);
