@@ -28,7 +28,7 @@ export function playUrl(store) {
 const GAME_SQL = `SELECT g.*, s.id AS store_id, s.name AS store_name, s.site_url, s.allowed_origins, s.colors AS store_colors,
     sg.from_name AS group_from_name, sg.from_email AS group_from_email, sg.reply_to AS group_reply_to
   FROM games g LEFT JOIN store_groups sg ON sg.id = g.group_id
-  LEFT JOIN LATERAL (SELECT * FROM stores x WHERE ($2::uuid IS NOT NULL AND x.id = $2) OR ($2::uuid IS NULL AND x.group_id = g.group_id)
+  LEFT JOIN LATERAL (SELECT * FROM stores x WHERE ($2::uuid IS NOT NULL AND x.id = $2) OR ($2::uuid IS NULL AND x.group_id = g.group_id AND x.archived_at IS NULL)
     ORDER BY x.created_at LIMIT 1) s ON true
   WHERE g.id = $1`;
 
@@ -41,10 +41,14 @@ export async function reminderFor(gameId, locale, storeId, norm) {
 // send one queued reminder (re-checking that it is still wanted) and record the outcome
 export async function deliver(rem) {
   const skip = async (why) => { await q(`UPDATE reminders SET status = 'skipped', error = $2 WHERE id = $1`, [rem.id, why]); return { ok: false, skipped: true, error: why }; };
+  // "played again" is per store group: one play per email per week across all of the group's stores
   const { rows: [why] } = await q(`SELECT
       EXISTS (SELECT 1 FROM unsubscribes u WHERE u.store_id = $1 AND u.email_norm = $2) AS unsub,
-      EXISTS (SELECT 1 FROM plays p WHERE p.store_id = $1 AND p.email_norm = $2 AND p.week_key = $3) AS played`,
+      EXISTS (SELECT 1 FROM plays p JOIN stores s ON s.id = p.store_id JOIN stores me ON me.id = $1
+              WHERE s.group_id = me.group_id AND p.email_norm = $2 AND p.week_key = $3) AS played,
+      EXISTS (SELECT 1 FROM stores me WHERE me.id = $1 AND me.archived_at IS NOT NULL) AS archived`,
     [rem.store_id, rem.email_norm, rem.week_key]);
+  if (why.archived) return skip('The store is archived');
   if (why.unsub) return skip('Unsubscribed');
   if (why.played) return skip('Already played again this week');
   const built = rem.game_id && await reminderFor(rem.game_id, rem.locale, rem.store_id, rem.email_norm);
@@ -63,7 +67,7 @@ async function queue(db, w) {
     FROM plays p JOIN games g ON g.id = p.game_id
     WHERE p.week_key = $1 AND NOT p.is_test AND p.store_id IS NOT NULL
       AND coalesce((g.texts->'reminder'->>'enabled')::boolean, true)
-      AND EXISTS (SELECT 1 FROM stores st JOIN games a ON a.group_id = st.group_id WHERE st.id = p.store_id AND a.status = 'active')
+      AND EXISTS (SELECT 1 FROM stores st JOIN games a ON a.group_id = st.group_id WHERE st.id = p.store_id AND st.archived_at IS NULL AND a.status = 'active' AND a.archived_at IS NULL)
       AND NOT EXISTS (SELECT 1 FROM unsubscribes u WHERE u.store_id = p.store_id AND u.email_norm = p.email_norm)
     ORDER BY p.store_id, p.email_norm, p.created_at DESC
     ON CONFLICT (store_id, email_norm, week_key) DO NOTHING`, [w.prevWeekKey, w.weekKey]);

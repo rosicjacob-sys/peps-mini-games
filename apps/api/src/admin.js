@@ -1,14 +1,23 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
+import rateLimit from 'express-rate-limit';
 import { GAME_TYPES, THEMES, SLOT_SYMBOLS, DEFAULT_THEME, ICON_TYPES, singleReward, themeCategory, isHex } from '@peps/shared';
 import { q, pool } from './db.js';
+import { isUuid, siteOrigin, originVariants } from './lib.js';
+import { resolveSender } from './email.js';
+import { detectStoreColors } from './colors.js';
+import { registerReports } from './reports.js';
+import { previewToken, clearConfigCache } from './public.js';
 
 export const adminRouter = Router();
 
 const safeEq = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 
-adminRouter.post('/login', (req, res) => {
+// one shared password: a wrong guess costs a try, ten tries cost fifteen minutes (per IP)
+const loginLimiter = rateLimit({ windowMs: 15 * 60_000, limit: Number(process.env.LOGIN_RATE_LIMIT) || 10, standardHeaders: true, legacyHeaders: false,
+  skipSuccessfulRequests: true, handler: (_req, res) => res.status(429).json({ error: 'Too many attempts. Try again in 15 minutes.' }) });
+adminRouter.post('/login', loginLimiter, (req, res) => {
   const pw = process.env.DASHBOARD_PASSWORD;
   if (!pw || !safeEq(req.body?.password ?? '', pw)) return res.status(401).json({ error: 'bad_password' });
   res.json({ token: jwt.sign({ admin: true }, process.env.JWT_SECRET, { expiresIn: '7d' }) });
@@ -18,14 +27,16 @@ adminRouter.use((req, res, next) => {
   try { jwt.verify((req.get('authorization') || '').replace(/^Bearer /, ''), process.env.JWT_SECRET); next(); }
   catch { res.status(401).json({ error: 'unauthorized' }); }
 });
-
-import { resolveSender } from './email.js';
-import { detectStoreColors } from './colors.js';
-import { registerReports } from './reports.js';
+// an id that is not a uuid is a 404, not a database error
+adminRouter.param('id', (req, res, next, id) => (isUuid(id) ? next() : res.status(404).json({ error: 'not_found' })));
+// every admin write may change what visitors get: the public config cache starts over
+adminRouter.use((req, res, next) => { if (req.method !== 'GET') res.on('finish', clearConfigCache); next(); });
 
 const wrap = (fn) => (req, res, next) => fn(req, res, next).catch(next);
 const loc = (v, max = 300) => ({ en: String(v?.en ?? '').slice(0, max), fr: String(v?.fr ?? '').slice(0, max) });
+const uniq = (a) => [...new Set(a)];
 
+// the "Play to Win" popup, set per store group
 function cleanIntro(i = {}) {
   return {
     enabled: i.enabled !== false,
@@ -39,20 +50,22 @@ function cleanIntro(i = {}) {
 // ---- store groups
 const groupFields = (b) => [String(b.name || '').trim().slice(0, 80) || 'Untitled group', String(b.from_name || '').slice(0, 120), String(b.from_email || '').trim().slice(0, 254), String(b.reply_to || '').trim().slice(0, 254)];
 adminRouter.get('/groups', wrap(async (_req, res) => {
-  const { rows } = await q(`SELECT g.*, (SELECT count(*)::int FROM stores s WHERE s.group_id = g.id) AS store_count,
-      (SELECT count(*)::int FROM games x WHERE x.group_id = g.id) AS game_count FROM store_groups g ORDER BY g.sort, g.created_at`);
+  const { rows } = await q(`SELECT g.*, (SELECT count(*)::int FROM stores s WHERE s.group_id = g.id AND s.archived_at IS NULL) AS store_count,
+      (SELECT count(*)::int FROM games x WHERE x.group_id = g.id AND x.archived_at IS NULL) AS game_count FROM store_groups g ORDER BY g.sort, g.created_at`);
   res.json(rows);
 }));
 adminRouter.post('/groups', wrap(async (req, res) => {
   const { rows } = await q('INSERT INTO store_groups (name, from_name, from_email, reply_to) VALUES ($1,$2,$3,$4) RETURNING *', groupFields(req.body));
   res.status(201).json(rows[0]);
 }));
+// name and sender; the intro popup too when the body carries one (the dashboard saves them from separate forms)
 adminRouter.put('/groups/:id', wrap(async (req, res) => {
-  const { rows } = await q('UPDATE store_groups SET name=$2, from_name=$3, from_email=$4, reply_to=$5 WHERE id=$1 RETURNING *', [req.params.id, ...groupFields(req.body)]);
+  const intro = req.body.intro !== undefined ? cleanIntro(req.body.intro) : null;
+  const { rows } = await q('UPDATE store_groups SET name=$2, from_name=$3, from_email=$4, reply_to=$5, intro = coalesce($6::jsonb, intro) WHERE id=$1 RETURNING *', [req.params.id, ...groupFields(req.body), intro]);
   rows[0] ? res.json(rows[0]) : res.sendStatus(404);
 }));
-// Deleting a group keeps its stores (they become ungrouped). A group that still has games can't be deleted:
-// its games (and their plays) would go with it.
+// Deleting a group keeps its stores (they become ungrouped). A group that still has games (archived ones too) can't
+// be deleted: its games (and their plays) would go with it.
 adminRouter.delete('/groups/:id', wrap(async (req, res) => {
   const { rows: [c] } = await q('SELECT count(*)::int AS n FROM games WHERE group_id = $1', [req.params.id]);
   if (c.n) return res.status(409).json({ error: `This group has ${c.n} game${c.n === 1 ? '' : 's'}. Delete or move them first.` });
@@ -63,13 +76,20 @@ adminRouter.delete('/groups/:id', wrap(async (req, res) => {
 adminRouter.get('/stores', wrap(async (_req, res) => {
   // a store shows its group's games
   const { rows } = await q(`SELECT s.*, sg.name AS group_name,
-      coalesce((SELECT json_agg(json_build_object('id', g.id, 'name', g.name, 'type', g.type, 'status', g.status, 'rewards', (SELECT count(*) FROM rewards r WHERE r.game_id = g.id AND r.active)) ORDER BY g.created_at) FROM games g WHERE g.group_id = s.group_id), '[]') AS games
+      coalesce((SELECT json_agg(json_build_object('id', g.id, 'name', g.name, 'type', g.type, 'status', g.status, 'rewards', (SELECT count(*) FROM rewards r WHERE r.game_id = g.id AND r.active)) ORDER BY g.created_at) FROM games g WHERE g.group_id = s.group_id AND g.archived_at IS NULL), '[]') AS games
     FROM stores s LEFT JOIN store_groups sg ON sg.id = s.group_id ORDER BY sg.sort, sg.name NULLS LAST, s.created_at`);
   for (const s of rows) s.game_count = s.games.length;
   res.json(rows);
 }));
-// the store's website, used for the "Play now" button in reminder emails (http(s) only)
-const siteUrl = (v) => { try { const u = new URL(String(v || '').trim()); return /^https?:$/.test(u.protocol) ? u.toString().slice(0, 300) : null; } catch { return null; } };
+// One website per store (its homepage: where the install line finds it, where the reminder's "Play now" button goes,
+// where its colours are read), plus optional other addresses it answers at. Each address is kept with and without
+// "www." since visitors land on either.
+function storeFields(b) {
+  const website = siteOrigin(b.website ?? b.site_url);
+  const aliases = (Array.isArray(b.aliases) ? b.aliases : Array.isArray(b.allowed_origins) ? b.allowed_origins : []).map(siteOrigin).filter(Boolean);
+  const origins = uniq([...(website ? originVariants(website) : []), ...aliases.flatMap(originVariants)]);
+  return { name: String(b.name || '').trim().slice(0, 80), group_id: isUuid(b.group_id) ? b.group_id : null, site_url: website, origins };
+}
 // the shared install line finds a store by its website, so a website can belong to one store only
 async function originsTaken(origins, storeId) {
   if (!origins.length) return null;
@@ -79,22 +99,22 @@ async function originsTaken(origins, storeId) {
   return `${dup} is already used by the store "${rows[0].name}".`;
 }
 adminRouter.post('/stores', wrap(async (req, res) => {
-  const origins = (req.body.allowed_origins || []).map((o) => String(o).trim().replace(/\/$/, '')).filter(Boolean);
-  const taken = await originsTaken(origins); if (taken) return res.status(400).json({ error: taken });
-  const { rows } = await q('INSERT INTO stores (name, allowed_origins, group_id, site_url) VALUES ($1,$2,$3,$4) RETURNING *', [String(req.body.name || '').trim() || 'Untitled store', origins, req.body.group_id || null, siteUrl(req.body.site_url)]);
+  const f = storeFields(req.body);
+  const taken = await originsTaken(f.origins); if (taken) return res.status(400).json({ error: taken });
+  const { rows } = await q('INSERT INTO stores (name, allowed_origins, group_id, site_url) VALUES ($1,$2,$3,$4) RETURNING *', [f.name || 'Untitled store', f.origins, f.group_id, f.site_url]);
   detectStoreColors(rows[0].id).catch(() => {});   // read its brand colours in the background
   res.status(201).json(rows[0]);
 }));
 adminRouter.put('/stores/:id', wrap(async (req, res) => {
-  const origins = (req.body.allowed_origins || []).map((o) => String(o).trim().replace(/\/$/, '')).filter(Boolean);
-  const taken = await originsTaken(origins, req.params.id); if (taken) return res.status(400).json({ error: taken });
+  const f = storeFields(req.body);
+  const taken = await originsTaken(f.origins, req.params.id); if (taken) return res.status(400).json({ error: taken });
   const { rows: [before] } = await q('SELECT * FROM stores WHERE id = $1', [req.params.id]);
   if (!before) return res.sendStatus(404);
   // brand colours: picked by hand ({mode:'manual', main, second}) or automatic ({mode:'auto'}: detected again)
   const c = req.body.colors; let colors = before.colors || {};
   if (c?.mode === 'manual' && isHex(c.main)) colors = { ...colors, mode: 'manual', main: c.main.toLowerCase(), second: isHex(c.second) ? c.second.toLowerCase() : '' };
   if (c?.mode === 'auto' && colors.mode === 'manual') colors = { mode: 'auto' };
-  const { rows } = await q('UPDATE stores SET name = $2, allowed_origins = $3, group_id = $4, site_url = $5, colors = $6 WHERE id = $1 RETURNING *', [req.params.id, String(req.body.name || '').trim(), origins, req.body.group_id || null, siteUrl(req.body.site_url), colors]);
+  const { rows } = await q('UPDATE stores SET name = $2, allowed_origins = $3, group_id = $4, site_url = $5, colors = $6 WHERE id = $1 RETURNING *', [req.params.id, f.name || before.name, f.origins, f.group_id, f.site_url, colors]);
   // a new website (or going back to automatic) re-reads the colours
   const siteChanged = (before.site_url || '') !== (rows[0].site_url || '') || before.allowed_origins.join() !== rows[0].allowed_origins.join();
   if (colors.mode !== 'manual' && (siteChanged || !colors.main)) detectStoreColors(rows[0].id).catch(() => {});
@@ -105,7 +125,7 @@ const WIDGET_MARK = 'pg-groups-v1';   // set by widget builds that support the s
 // the API's own public address (for fixes that name it)
 const apiBase = () => (process.env.PUBLIC_API_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/$/, '');
 // Which of these [directive, url] pairs a Content-Security-Policy header would block (directive falls back to default-src).
-function cspBlocks(header, pairs) {
+export function cspBlocks(header, pairs) {
   if (!header) return [];
   const dirs = Object.fromEntries(header.split(';').map((d) => d.trim().split(/\s+/)).filter((d) => d[0]).map(([k, ...v]) => [k.toLowerCase(), v]));
   return pairs.filter(([name, url]) => {
@@ -123,15 +143,16 @@ function cspBlocks(header, pairs) {
 }
 
 adminRouter.get('/stores/:id/check', wrap(async (req, res) => {
-  const { rows: [s] } = await q(`SELECT s.*, (SELECT count(*)::int FROM games g WHERE g.group_id = s.group_id AND g.status = 'active') AS live
+  const { rows: [s] } = await q(`SELECT s.*, (SELECT count(*)::int FROM games g WHERE g.group_id = s.group_id AND g.status = 'active' AND g.archived_at IS NULL) AS live
     FROM stores s WHERE s.id = $1`, [req.params.id]);
   if (!s) return res.sendStatus(404);
   const checks = []; const add = (ok, label, fix) => { checks.push({ ok: !!ok, label, fix: ok ? null : fix }); return ok; };
   const done = (extra = {}) => res.json({ ok: checks.every((c) => c.ok), checks, ...extra });
+  if (!add(!s.archived_at, 'The store is not archived', 'Archived stores show no games. Restore it on the Stores page.')) return done();
   add(s.group_id, 'The store is in a store group', 'Edit the store and pick its group: a store shows its group\'s games.');
   add(s.live > 0, `Its group has live games (${s.live})`, 'Add games to the group on the Games page, or switch them to Live.');
   // a live game with no active rewards cannot be played, so the site never lists it
-  const { rows: bare } = await q(`SELECT g.name FROM games g WHERE g.group_id = $1 AND g.status = 'active'
+  const { rows: bare } = await q(`SELECT g.name FROM games g WHERE g.group_id = $1 AND g.status = 'active' AND g.archived_at IS NULL
     AND NOT EXISTS (SELECT 1 FROM rewards r WHERE r.game_id = g.id AND r.active) ORDER BY g.created_at`, [s.group_id]);
   if (s.live > 0) add(!bare.length, 'Every live game has rewards', `${bare.map((g) => g.name).join(', ')} ${bare.length > 1 ? 'have' : 'has'} no active rewards, so the site hides ${bare.length > 1 ? 'them' : 'it'}. Open the game, add rewards from the library on its Rewards tab, and Save.`);
   const url = s.site_url || s.allowed_origins[0];
@@ -150,7 +171,7 @@ adminRouter.get('/stores/:id/check', wrap(async (req, res) => {
   if (tags.length > 1) add(false, `The install line is on the page once (found ${tags.length})`, 'Remove the extra copies from theme.liquid.');
   const t = tags[0];
   if (t.key) add(t.key === s.public_key, 'The line\'s data-store key is this store\'s', 'The pasted line carries another store\'s key. Use the shared line (no key) from the Stores page.');
-  else add(s.allowed_origins.includes(origin), `The site's address (${origin}) is in the store's websites`, `Visitors land on ${origin}. Add exactly that address to the store's websites (Edit), including www. if it is used.`);
+  else add(s.allowed_origins.includes(origin), `The site's address (${origin}) is one of the store's websites`, `Visitors land on ${origin}. Set that as the store's website (Edit), or add it under "Also answers at".`);
   let js = '';
   try {
     const r = await fetch(t.src, { signal: AbortSignal.timeout(10000) });
@@ -189,31 +210,44 @@ adminRouter.post('/stores/:id/detect-colors', wrap(async (req, res) => {
   if (!r) return res.sendStatus(404);
   r.error && !r.main ? res.status(400).json(r) : res.json(r);
 }));
-adminRouter.delete('/stores/:id', wrap(async (req, res) => { await q('DELETE FROM stores WHERE id = $1', [req.params.id]); res.sendStatus(204); }));
+// Archive instead of delete: the store disappears from the sites and the setup pages, its plays stay in the reports.
+adminRouter.post('/stores/:id/archive', wrap(async (req, res) => {
+  const { rows } = await q('UPDATE stores SET archived_at = now() WHERE id = $1 AND archived_at IS NULL RETURNING *', [req.params.id]);
+  rows[0] ? res.json(rows[0]) : res.sendStatus(404);
+}));
+adminRouter.post('/stores/:id/restore', wrap(async (req, res) => {
+  const { rows } = await q('UPDATE stores SET archived_at = NULL WHERE id = $1 RETURNING *', [req.params.id]);
+  rows[0] ? res.json(rows[0]) : res.sendStatus(404);
+}));
+// permanent: only an archived store, and its play history goes with it
+adminRouter.delete('/stores/:id', wrap(async (req, res) => {
+  const { rowCount } = await q('DELETE FROM stores WHERE id = $1 AND archived_at IS NOT NULL', [req.params.id]);
+  rowCount ? res.sendStatus(204) : res.status(409).json({ error: 'Archive the store first; only archived stores can be deleted.' });
+}));
 
 // ---- games
 adminRouter.get('/games', wrap(async (req, res) => {
   const { rows } = await q(`
     SELECT g.*, sg.name AS group_name,
-      (SELECT count(*)::int FROM stores s WHERE s.group_id = g.group_id) AS store_count,
+      (SELECT count(*)::int FROM stores s WHERE s.group_id = g.group_id AND s.archived_at IS NULL) AS store_count,
       (SELECT count(*)::int FROM plays p WHERE p.game_id = g.id AND NOT p.is_test) AS play_count,
       (SELECT count(*)::int FROM rewards r WHERE r.game_id = g.id AND r.active) AS reward_count
     FROM games g LEFT JOIN store_groups sg ON sg.id = g.group_id
     WHERE ($1::uuid IS NULL OR g.group_id = $1) AND ($2::uuid IS NULL OR g.group_id = (SELECT group_id FROM stores WHERE id = $2))
-    ORDER BY sg.sort, sg.name NULLS LAST, g.created_at`, [req.query.group_id || null, req.query.store_id || null]);
+      AND ($3::boolean OR g.archived_at IS NULL)
+    ORDER BY sg.sort, sg.name NULLS LAST, g.created_at`, [isUuid(req.query.group_id) ? req.query.group_id : null, isUuid(req.query.store_id) ? req.query.store_id : null, req.query.archived === '1']);
   res.json(rows);
 }));
 adminRouter.get('/games/:id', wrap(async (req, res) => {
   const { rows: [g] } = await q(`SELECT g.*, sg.name AS group_name,
       sg.from_name AS group_from_name, sg.from_email AS group_from_email, sg.reply_to AS group_reply_to,
-      coalesce((SELECT array_agg(s.name ORDER BY s.created_at) FROM stores s WHERE s.group_id = g.group_id), '{}') AS store_names,
-      coalesce((SELECT json_agg(json_build_object('id', s.id, 'name', s.name, 'colors', s.colors) ORDER BY s.created_at) FROM stores s WHERE s.group_id = g.group_id), '[]') AS stores
+      coalesce((SELECT array_agg(s.name ORDER BY s.created_at) FROM stores s WHERE s.group_id = g.group_id AND s.archived_at IS NULL), '{}') AS store_names,
+      coalesce((SELECT json_agg(json_build_object('id', s.id, 'name', s.name, 'colors', s.colors) ORDER BY s.created_at) FROM stores s WHERE s.group_id = g.group_id AND s.archived_at IS NULL), '[]') AS stores
     FROM games g LEFT JOIN store_groups sg ON sg.id = g.group_id WHERE g.id = $1`, [req.params.id]);
   if (!g) return res.sendStatus(404);
   const { rows: rewards } = await q('SELECT * FROM rewards WHERE game_id = $1 ORDER BY sort, id', [g.id]);
   res.json({ ...g, rewards, effective_sender: resolveSender(g) });
 }));
-
 
 // sound settings: effects on/off; music built-in, off, or a custom https file
 const cleanSound = (s = {}) => {
@@ -233,7 +267,7 @@ function gameFields(b) {
     type: b.type, name: String(b.name || GAME_TYPES[b.type].label).slice(0, 80),
     status: b.status === 'paused' ? 'paused' : 'active', theme, brand,
     per: singleReward(b.type) ? 1 : Math.min(5, Math.max(1, parseInt(b.rewards_per_play, 10) || 1)),
-    texts: { heading: loc(tx.heading), subheading: loc(tx.subheading), privacy: loc(tx.privacy), triggerLabel: loc(tx.triggerLabel), privacyUrl: String(tx.privacyUrl || '').slice(0, 300), intro: cleanIntro(tx.intro), sound: cleanSound(tx.sound), reminder: { enabled: tx.reminder?.enabled !== false },
+    texts: { heading: loc(tx.heading), subheading: loc(tx.subheading), privacy: loc(tx.privacy), triggerLabel: loc(tx.triggerLabel), privacyUrl: String(tx.privacyUrl || '').slice(0, 300), sound: cleanSound(tx.sound), reminder: { enabled: tx.reminder?.enabled !== false },
       // arcade games: a preset palette, or each store's own website colours (the palette is then the fallback)
       colors: { mode: tx.colors?.mode === 'site' ? 'site' : 'theme' } },
     from_name: String(b.from_name || '').slice(0, 120), from_email: String(b.from_email || '').trim().slice(0, 254), reply_to: String(b.reply_to || '').trim().slice(0, 254),
@@ -242,7 +276,7 @@ function gameFields(b) {
 }
 adminRouter.post('/games', wrap(async (req, res) => {
   const f = gameFields(req.body);
-  const { rows: [grp] } = await q('SELECT id FROM store_groups WHERE id = $1', [/^[0-9a-f-]{36}$/i.test(req.body.group_id || '') ? req.body.group_id : null]);
+  const { rows: [grp] } = await q('SELECT id FROM store_groups WHERE id = $1', [isUuid(req.body.group_id) ? req.body.group_id : null]);
   if (!grp) return res.status(400).json({ error: 'Pick the store group this game is for.' });
   const { rows } = await q(`INSERT INTO games (group_id,type,name,status,theme,brand_accent,rewards_per_play,texts,from_name,from_email,reply_to,email_subject)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
@@ -255,21 +289,38 @@ adminRouter.put('/games/:id', wrap(async (req, res) => {
     [req.params.id, f.name, f.status, f.theme, f.brand, f.per, f.texts, f.from_name, f.from_email, f.reply_to, f.subject]);
   rows[0] ? res.json(rows[0]) : res.sendStatus(404);
 }));
-adminRouter.delete('/games/:id', wrap(async (req, res) => { await q('DELETE FROM games WHERE id = $1', [req.params.id]); res.sendStatus(204); }));
+// Archive instead of delete: the game leaves the sites and the Games page, its plays stay in the reports.
+adminRouter.post('/games/:id/archive', wrap(async (req, res) => {
+  const { rows } = await q('UPDATE games SET archived_at = now() WHERE id = $1 AND archived_at IS NULL RETURNING *', [req.params.id]);
+  rows[0] ? res.json(rows[0]) : res.sendStatus(404);
+}));
+adminRouter.post('/games/:id/restore', wrap(async (req, res) => {
+  const { rows } = await q('UPDATE games SET archived_at = NULL WHERE id = $1 RETURNING *', [req.params.id]);
+  rows[0] ? res.json(rows[0]) : res.sendStatus(404);
+}));
+adminRouter.delete('/games/:id', wrap(async (req, res) => {
+  const { rowCount } = await q('DELETE FROM games WHERE id = $1 AND archived_at IS NOT NULL', [req.params.id]);
+  rowCount ? res.sendStatus(204) : res.status(409).json({ error: 'Archive the game first; only archived games can be deleted.' });
+}));
+// a token that lets the dashboard open this game in the widget; plays made with it are never recorded
+adminRouter.post('/games/:id/preview', wrap(async (req, res) => {
+  const { rows: [g] } = await q('SELECT id FROM games WHERE id = $1', [req.params.id]);
+  g ? res.json({ token: previewToken(g.id) }) : res.sendStatus(404);
+}));
 
 // ---- rewards: replace the whole list. Active probabilities must total 100.
 adminRouter.put('/games/:id/rewards', wrap(async (req, res) => {
   const list = Array.isArray(req.body.rewards) ? req.body.rewards : [];
   const { rows: [g] } = await q('SELECT type FROM games WHERE id = $1', [req.params.id]);
   if (!g) return res.sendStatus(404);
-  const libIds = list.map((r) => r.library_id).filter((x) => /^[0-9a-f-]{36}$/i.test(x || ''));
+  const libIds = list.map((r) => r.library_id).filter(isUuid);
   const { rows: libRows } = libIds.length ? await q('SELECT * FROM reward_library WHERE id = ANY($1::uuid[])', [libIds]) : { rows: [] };
   const lib = new Map(libRows.map((x) => [x.id, x]));
-  const clean = list.map((r, i) => (lib.has(r.library_id) ? { ...r, ...pickLib(lib.get(r.library_id), r) } : r)).map((r, i) => ({
+  const clean = list.map((r) => (lib.has(r.library_id) ? { ...r, ...pickLib(lib.get(r.library_id), r) } : r)).map((r, i) => ({
     library_id: lib.has(r.library_id) ? r.library_id : null,
     symbol: ICON_TYPES.includes(g.type) && SLOT_SYMBOLS.includes(r.symbol) ? r.symbol : null,
     outcome: null, // legacy column: blackjack no longer maps a reward to a hand result
-    id: r.id || null, title: loc(r.title), subtitle: loc(r.subtitle), code: String(r.code || '').trim().slice(0, 80),
+    id: isUuid(r.id) ? r.id : null, title: loc(r.title), subtitle: loc(r.subtitle), code: String(r.code || '').trim().slice(0, 80),
     probability: Math.max(0, Math.min(100, Number(r.probability) || 0)), active: r.active !== false, sort: i,
   }));
   if (clean.some((r) => !r.library_id)) return res.status(400).json({ error: 'Rewards come from the rewards library. Add them with "+ Add from library".' });
@@ -303,9 +354,9 @@ const libFields = (b) => {
   return f;
 };
 adminRouter.get('/library', wrap(async (_req, res) => {
-  const { rows } = await q(`SELECT l.*, count(r.id)::int AS used_in,
-      coalesce(json_agg(json_build_object('game_id', g.id, 'game', g.name, 'store', s.name)) FILTER (WHERE r.id IS NOT NULL), '[]') AS games
-    FROM reward_library l LEFT JOIN rewards r ON r.library_id = l.id LEFT JOIN games g ON g.id = r.game_id LEFT JOIN store_groups s ON s.id = g.group_id
+  const { rows } = await q(`SELECT l.*, count(r.id) FILTER (WHERE g.archived_at IS NULL)::int AS used_in,
+      coalesce(json_agg(json_build_object('game_id', g.id, 'game', g.name, 'group', sg.name)) FILTER (WHERE r.id IS NOT NULL AND g.archived_at IS NULL), '[]') AS games
+    FROM reward_library l LEFT JOIN rewards r ON r.library_id = l.id LEFT JOIN games g ON g.id = r.game_id LEFT JOIN store_groups sg ON sg.id = g.group_id
     GROUP BY l.id ORDER BY l.title->>'en'`);
   res.json(rows);
 }));
@@ -373,49 +424,7 @@ export async function linkCustomRewards() {
   return { created, linked };
 }
 
-// ---- stats: players, rewards tally
-adminRouter.get('/games/:id/stats', wrap(async (req, res) => {
-  const id = req.params.id;
-  const [{ rows: [t] }, { rows: tally }, { rows: byDay }] = await Promise.all([
-    q(`SELECT count(*)::int AS plays, count(DISTINCT email_norm)::int AS players,
-         count(*) FILTER (WHERE created_at >= now() - interval '7 days')::int AS plays_7d,
-         count(*) FILTER (WHERE email_status = 'failed')::int AS email_failed FROM plays WHERE game_id = $1 AND NOT is_test`, [id]),
-    q(`SELECT pr.reward_id, (array_agg(pr.title ORDER BY p.created_at DESC))[1] AS title, (array_agg(pr.code ORDER BY p.created_at DESC))[1] AS code,
-         count(*)::int AS won, count(DISTINCT p.email_norm)::int AS players
-       FROM play_rewards pr JOIN plays p ON p.id = pr.play_id WHERE pr.game_id = $1 AND NOT p.is_test
-       GROUP BY pr.reward_id ORDER BY won DESC`, [id]),
-    q(`SELECT to_char(date_trunc('day', created_at AT TIME ZONE 'America/Toronto'), 'YYYY-MM-DD') AS day, count(*)::int AS plays
-       FROM plays WHERE game_id = $1 AND NOT is_test AND created_at >= now() - interval '30 days' GROUP BY 1 ORDER BY 1`, [id]),
-  ]);
-  res.json({ ...t, tally, byDay });
-}));
-
-// Who won what. Optional ?reward_id= filter.
-adminRouter.get('/games/:id/plays', wrap(async (req, res) => {
-  const { rows } = await q(`
-    SELECT p.id, p.email, p.created_at, p.email_status, p.locale, pr.reward_id, pr.title, pr.code
-    FROM plays p JOIN play_rewards pr ON pr.play_id = p.id
-    WHERE p.game_id = $1 AND NOT p.is_test AND ($2::uuid IS NULL OR pr.reward_id = $2)
-    ORDER BY p.created_at DESC LIMIT $3 OFFSET $4`,
-    [req.params.id, req.query.reward_id || null, Math.min(500, parseInt(req.query.limit, 10) || 100), parseInt(req.query.offset, 10) || 0]);
-  res.json(rows);
-}));
-
-const csvCell = (v) => { const s = String(v ?? ''); return /^[=+\-@\t\r]/.test(s) ? `"'${s.replace(/"/g, '""')}"` : /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-
-// CSV export of emails (+ rewards). ?reward_id= to limit to one reward. Use game id "all" for every game.
-adminRouter.get('/games/:id/export.csv', wrap(async (req, res) => {
-  const all = req.params.id === 'all';
-  const { rows } = await q(`
-    SELECT p.email, p.locale, p.created_at, g.name AS game, s.name AS store, sg.name AS store_group, pr.title, pr.code
-    FROM plays p JOIN play_rewards pr ON pr.play_id = p.id JOIN games g ON g.id = p.game_id JOIN stores s ON s.id = p.store_id
-    LEFT JOIN store_groups sg ON sg.id = s.group_id
-    WHERE NOT p.is_test AND ($1::boolean OR p.game_id = $2::uuid) AND ($3::uuid IS NULL OR pr.reward_id = $3)
-    ORDER BY p.created_at DESC`, [all, all ? null : req.params.id, req.query.reward_id || null]);
-  const head = 'email,store_group,store,game,reward,code,language,played_at';
-  const body = rows.map((r) => [r.email, r.store_group, r.store, r.game, r.title?.en, r.code, r.locale, r.created_at.toISOString()].map(csvCell).join(','));
-  res.type('text/csv').set('Content-Disposition', 'attachment; filename="players.csv"').send([head, ...body].join('\n'));
-}));
+export const csvCell = (v) => { const s = String(v ?? ''); return /^[=+\-@\t\r]/.test(s) ? `"'${s.replace(/"/g, '""')}"` : /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 
 registerReports(adminRouter, wrap, csvCell);
 
