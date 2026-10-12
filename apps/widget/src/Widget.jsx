@@ -92,22 +92,23 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
   const [intro, setIntro] = useState(false);
   const [game, setGame] = useState(null);
 
-  useEffect(() => {
-    fetch(`${api}/api/public/config?key=${encodeURIComponent(store)}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d) => {
-        const list = d.games.filter((g) => GAMES[g.type] && (!gameType || g.type === gameType));
-        setGames(list);
-        if (list.length === 1) setGame(list[0]);
-      })
-      .catch(() => setGames([]));
-  }, [store, api, gameType]);
+  // The store's live games (paused ones are never listed). Loaded with the page and again every time the game
+  // window opens, so a game paused in the dashboard disappears even from a page that was already open.
+  const loadGames = (refresh) => fetch(`${api}/api/public/config?key=${encodeURIComponent(store)}`, { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : Promise.reject()))
+    .then((d) => {
+      const list = d.games.filter((g) => GAMES[g.type] && (!gameType || g.type === gameType));
+      setGames(list);
+      setGame((cur) => (list.length === 1 ? list[0] : cur && list.find((g) => g.id === cur.id)) || null);
+    })
+    .catch(() => { if (!refresh) setGames([]); });
+  useEffect(() => { loadGames(false); }, [store, api, gameType]);
 
   const current = game || games?.[0];
   // sounds follow the game on screen; music plays only while the game window is open
   useEffect(() => { if (current) sound.configure(current.texts?.sound, categoryOf(current.type)); }, [current?.id]);
   useEffect(() => { sound.music(open); return () => sound.music(false); }, [open]);
-  const openGame = () => { sound.unlock(); setOpen(true); };
+  const openGame = () => { sound.unlock(); setOpen(true); loadGames(true); };
   // closing forgets the chosen game when the store has several, so "Play & Win" opens the picker again
   const close = () => { setOpen(false); if (games?.length > 1) setGame(null); };
 
@@ -150,7 +151,7 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
             <LangToggle locale={locale} setLocale={setLocale} />
             <SoundToggle locale={locale} />
             <button className="close" aria-label={ui.close} onClick={close}>×</button>
-            {game ? <Play key={game.id} game={game} arcade={arcade} api={api} store={store} locale={locale} onClose={close} onBack={games.length > 1 ? () => setGame(null) : null} /> : (
+            {game ? <Play key={game.id} game={game} arcade={arcade} api={api} store={store} locale={locale} onClose={close} onBack={games.length > 1 ? () => setGame(null) : null} onUnavailable={() => loadGames(true)} /> : (
               <div className="picker">
                 <Head arcade={arcade} title={ui.choose} />
                 {families.map(([c, list]) => (
@@ -232,7 +233,7 @@ function Intro({ game, arcade, locale, setLocale, onPlay, onDecline }) {
   );
 }
 
-function Play({ game, arcade, api, store, locale, onClose, onBack }) {
+function Play({ game, arcade, api, store, locale, onClose, onBack, onUnavailable }) {
   const ui = UI[locale];
   const stages = GAMES[game.type];
   const [stage, setStage] = useState(0);
@@ -264,6 +265,8 @@ function Play({ game, arcade, api, store, locale, onClose, onBack }) {
         setError(`${ui.already} ${data.email || email.trim()}. ${ui.onePer} ${ui.comeBack} ${when}${ui.orOther}.`);
       }
       else if (data.error === 'invalid_email') setError(ui.invalidEmail);
+      // paused (or removed) in the dashboard while the window was open
+      else if (data.error === 'game_unavailable') { setError(ui.paused); onUnavailable?.(); }
       else setError(ui.error);
     } catch { setError(ui.error); }
     setBusy(false);
