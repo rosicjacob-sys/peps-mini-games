@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { UI, t, themeFor, categoryOf, POPS } from '@peps/shared';
+import { UI, t, gameTheme, categoryOf, POPS } from '@peps/shared';
 import { sound } from '../sound.js';
 
 const R = 150;
@@ -35,7 +35,7 @@ function layoutLabel(text, maxLines) {
 // With several rewards per play the player spins once per reward.
 export default function Wheel({ game, result, locale, onDone }) {
   const ui = UI[locale];
-  const th = themeFor(game.type, game.theme);
+  const th = gameTheme(game);
   // the arcade wheel (Lucky Spin): candy-bright slices with readable labels, white rim
   const arcade = categoryOf(game.type) === 'arcade';
   // a standalone wheel that can lose gets a "Try again" slice; a lost play spins once onto it
@@ -113,7 +113,8 @@ export default function Wheel({ game, result, locale, onDone }) {
   }
 
   const rim = arcade ? '#ffffff' : th.rim || th.accent;
-  const tones = arcade ? POPS.map((p) => p.bg) : th.wheel || th.slices;
+  const pops = th.pops || POPS;   // website colours when the game matches the site
+  const tones = arcade ? pops.map((p) => p.bg) : th.wheel || th.slices;
   const pegs = Math.max(16, n * 4);
 
   return (
@@ -135,7 +136,7 @@ export default function Wheel({ game, result, locale, onDone }) {
           const [x0, y0] = polar(a0, R - 7), [x1, y1] = polar(a1, R - 7);
           const k = (n % tones.length === 1 && i === n - 1) ? 1 : i % tones.length;
           const fill = arcade && r.lose ? '#ece8f2' : tones[k];
-          const ink = !arcade ? th.text : r.lose ? '#4a4458' : POPS[k].fg;
+          const ink = !arcade ? th.text : r.lose ? '#4a4458' : pops[k].fg;
           const mid = a0 + step / 2;
           const [tx, ty] = polar(mid, R * 0.57);
           const { lines, f } = layoutLabel(t(r.title, locale), maxLines);

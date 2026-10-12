@@ -345,3 +345,11 @@ button.primary-outline { border-color: var(--primary); font-weight: 650; }
 
 .install-shared h2 { font-size: 15px; margin: 0 0 10px; }
 .store-games { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+
+.colour-mode { margin-bottom: 12px; }
+.site-colors { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.row.tight { gap: 8px; align-items: center; }
+.found-colors { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.found-colour { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 4px 6px; }
+.found-colour i { width: 18px; height: 18px; border-radius: 5px; border: 1px solid rgba(0,0,0,.15); }
+.found-colour code { font-size: 12px; }

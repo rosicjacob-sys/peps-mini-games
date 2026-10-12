@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
-import { GAME_TYPES, THEMES, SLOT_SYMBOLS, DEFAULT_THEME, ICON_TYPES, singleReward, themeCategory } from '@peps/shared';
+import { GAME_TYPES, THEMES, SLOT_SYMBOLS, DEFAULT_THEME, ICON_TYPES, singleReward, themeCategory, isHex } from '@peps/shared';
 import { q, pool } from './db.js';
 
 export const adminRouter = Router();
@@ -112,6 +112,37 @@ adminRouter.get('/games/:id', wrap(async (req, res) => {
   res.json({ ...g, rewards, effective_sender: resolveSender(g) });
 }));
 
+// "Detect from my website": read the homepage of a store in the game's group and suggest the colours its theme uses
+// most (theme-color meta, CSS colour variables, inline styles), leaving out greys, near-white and near-black.
+const toHex = (r, g, b) => `#${[r, g, b].map((v) => Math.max(0, Math.min(255, Number(v))).toString(16).padStart(2, '0')).join('')}`;
+function colourful(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+  const sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  return sat > 0.25 && l > 0.12 && l < 0.88;
+}
+adminRouter.get('/games/:id/site-colors', wrap(async (req, res) => {
+  const { rows: [st] } = await q(`SELECT s.name, s.site_url, s.allowed_origins FROM games g JOIN stores s ON s.group_id = g.group_id
+    WHERE g.id = $1 AND (s.site_url IS NOT NULL OR cardinality(s.allowed_origins) > 0) ORDER BY s.created_at LIMIT 1`, [req.params.id]);
+  const url = st && (st.site_url || st.allowed_origins[0]);
+  if (!url) return res.status(400).json({ error: 'No store in this group has a website listed yet (Stores → Edit).' });
+  let html = '';
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'Mozilla/5.0 (peps-games colour check)' }, redirect: 'follow' });
+    html = (await r.text()).slice(0, 3_000_000);
+  } catch (e) { return res.status(502).json({ error: `Could not open ${url} (${e.name === 'TimeoutError' ? 'timed out' : e.message}).` }); }
+  const counts = new Map(); const add = (hex, w = 1) => { hex = hex.toLowerCase(); if (colourful(hex)) counts.set(hex, (counts.get(hex) || 0) + w); };
+  const meta = html.match(/<meta[^>]+name=["']theme-color["'][^>]*content=["'](#[0-9a-f]{6})/i)?.[1];
+  if (meta) add(meta, 50);
+  // CSS colour variables count more than ordinary colours (they are the theme's settings)
+  for (const m of html.matchAll(/--[\w-]*colou?r[\w-]*\s*:\s*(#[0-9a-f]{6})\b/gi)) add(m[1], 5);
+  for (const m of html.matchAll(/--[\w-]*colou?r[\w-]*\s*:\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\b/gi)) add(toHex(m[1], m[2], m[3]), 5);
+  for (const m of html.matchAll(/#([0-9a-f]{6})\b/gi)) add(`#${m[1]}`);
+  for (const m of html.matchAll(/rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/gi)) add(toHex(m[1], m[2], m[3]));
+  const colors = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([hex]) => hex);
+  res.json({ url, store: st.name, colors });
+}));
+
 // sound settings: effects on/off; music built-in, off, or a custom https file
 const cleanSound = (s = {}) => {
   const url = /^https:\/\/\S+$/i.test(String(s.musicUrl || '').trim()) ? String(s.musicUrl).trim().slice(0, 500) : '';
@@ -130,7 +161,9 @@ function gameFields(b) {
     type: b.type, name: String(b.name || GAME_TYPES[b.type].label).slice(0, 80),
     status: b.status === 'paused' ? 'paused' : 'active', theme, brand,
     per: singleReward(b.type) ? 1 : Math.min(5, Math.max(1, parseInt(b.rewards_per_play, 10) || 1)),
-    texts: { heading: loc(tx.heading), subheading: loc(tx.subheading), privacy: loc(tx.privacy), triggerLabel: loc(tx.triggerLabel), privacyUrl: String(tx.privacyUrl || '').slice(0, 300), intro: cleanIntro(tx.intro), sound: cleanSound(tx.sound), reminder: { enabled: tx.reminder?.enabled !== false } },
+    texts: { heading: loc(tx.heading), subheading: loc(tx.subheading), privacy: loc(tx.privacy), triggerLabel: loc(tx.triggerLabel), privacyUrl: String(tx.privacyUrl || '').slice(0, 300), intro: cleanIntro(tx.intro), sound: cleanSound(tx.sound), reminder: { enabled: tx.reminder?.enabled !== false },
+      // arcade games: preset palette, or the website's own colours
+      colors: { mode: tx.colors?.mode === 'site' && isHex(tx.colors?.main) ? 'site' : 'theme', main: isHex(tx.colors?.main) ? tx.colors.main : '', second: isHex(tx.colors?.second) ? tx.colors.second : '' } },
     from_name: String(b.from_name || '').slice(0, 120), from_email: String(b.from_email || '').trim().slice(0, 254), reply_to: String(b.reply_to || '').trim().slice(0, 254),
     subject: loc(b.email_subject),
   };

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, hasToken, logout, WIDGET_URL } from './api.js';
-import { GAME_TYPES, CATEGORIES, categoryOf, themeFor } from '@peps/shared';
+import { GAME_TYPES, CATEGORIES, categoryOf, gameTheme } from '@peps/shared';
 import GameEditor from './GameEditor.jsx';
 import Overview, { PageHead } from './pages/Overview.jsx';
 import Players from './pages/Players.jsx';
@@ -128,7 +128,7 @@ function Games({ open }) {
             <h2 className="section-title"><span aria-hidden="true">{cat.icon}</span> {cat.label.en} games <span className="muted small">{cat.blurb}</span></h2>
             <div className="game-grid">
         {inCat.map((g) => {
-          const th = themeFor(g.type, g.theme);
+          const th = gameTheme(g);
           return (
             <article key={g.id} className="game-card">
               <button className="gc-main" onClick={() => open(g.id)}>

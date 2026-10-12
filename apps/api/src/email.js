@@ -1,4 +1,4 @@
-import { t, themeFor, categoryOf, GAME_TYPES } from '@peps/shared';
+import { t, gameTheme, categoryOf, GAME_TYPES } from '@peps/shared';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -20,13 +20,13 @@ const COPY = {
 // The weekly "play again" email, styled like the game they played (casino felt and gold, or arcade gradient).
 export function buildReminder({ game, locale, playUrl, unsubUrl }) {
   const c = COPY[locale] || COPY.en;
-  const th = themeFor(game.type, game.theme);
+  const th = gameTheme(game);
   const arcade = categoryOf(game.type) === 'arcade';
   const subject = t(game.email_subject, locale) || c.subject;
   const store = game.store_name || '';
   const head = arcade ? `background-color:${th.grad[1]};background-image:linear-gradient(135deg,${th.grad[0]},${th.grad[1]})` : `background-color:${th.bg}`;
   const font = arcade ? "'Trebuchet MS',Arial,Helvetica,sans-serif" : "Georgia,'Times New Roman',serif";   // single quotes: it goes inside style="..."
-  const title = arcade ? '#ffffff' : (th.rim || '#D6B24A');
+  const title = arcade ? (th.onGrad || '#ffffff') : (th.rim || '#D6B24A');
   const icon = GAME_TYPES[game.type]?.icon || '🎁';
   const button = playUrl ? `<p style="margin:26px 0 8px"><a href="${esc(playUrl)}" style="display:inline-block;background:${th.accent};color:${th.accentText};font-weight:700;font-size:17px;text-decoration:none;padding:14px 34px;border-radius:${arcade ? 16 : 10}px">${c.cta}</a></p>` : '';
   const html = `<!doctype html><html><body style="margin:0;background:#f4f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827">

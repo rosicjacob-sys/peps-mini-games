@@ -1,12 +1,21 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 const COLORS = ['#FFD166', '#EF476F', '#06D6A0', '#118AB2', '#8B5CF6', '#F78C6B', '#FFFFFF'];
 
 // One-shot confetti burst on a full-screen canvas. Skipped for visitors who prefer reduced motion.
+// The canvas is rendered at the widget's root, outside the game window: an animated (transformed) window would
+// otherwise become the canvas's frame, and the full-screen canvas would make the window scroll.
 export default function Confetti({ duration = 4200 }) {
-  const ref = useRef(null);
+  const ref = useRef(null); const probe = useRef(null);
+  const [target, setTarget] = useState(null);
+  useLayoutEffect(() => {
+    const root = probe.current?.getRootNode(); const host = document.createElement('div');
+    (root instanceof ShadowRoot ? root : document.body).appendChild(host); setTarget(host);
+    return () => host.remove();
+  }, []);
   useEffect(() => {
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    if (!target || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
     const canvas = ref.current; const ctx = canvas.getContext('2d');
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const resize = () => { canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr; };
@@ -37,6 +46,6 @@ export default function Confetti({ duration = 4200 }) {
     };
     raf = requestAnimationFrame(tick);
     return () => { cancelAnimationFrame(raf); removeEventListener('resize', resize); };
-  }, []);
-  return <canvas ref={ref} className="confetti" aria-hidden="true" />;
+  }, [target]);
+  return <>{!target && <span ref={probe} hidden />}{target && createPortal(<canvas ref={ref} className="confetti" aria-hidden="true" />, target)}</>;
 }
