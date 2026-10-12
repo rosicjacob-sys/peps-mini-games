@@ -139,6 +139,7 @@ function Games({ open }) {
                   <b>{g.name}</b>
                   <span className="muted small">{GAME_TYPES[g.type]?.label} · {th.label}</span>
                   <span className="small">{g.group_name}<span className="muted"> · {g.store_count} store{g.store_count === 1 ? '' : 's'}</span></span>
+                  {g.status === 'active' && !g.reward_count && <span className="pill failed">No rewards: hidden on the stores</span>}
                 </span>
               </button>
               <div className="gc-foot">
@@ -276,6 +277,7 @@ function InstallCheck({ s }) {
           <ul className="check-list">
             {r.checks.map((c, i) => <li key={i} className={c.ok ? 'ok' : 'no'}><span aria-hidden="true">{c.ok ? '✓' : '✕'}</span><div><b>{c.label}</b>{c.fix && <p className="muted small">{c.fix}</p>}</div></li>)}
           </ul>
+          {r.ok && <p className="muted small">Still nothing on the site? Look for the button in the bottom-right corner, then reload the page with the cache cleared (Ctrl+Shift+R, or Cmd+Shift+R on a Mac): browsers keep the widget for up to 5 minutes.</p>}
           <button className="ghost small" onClick={run}>Check again</button>
         </>
       )}
@@ -303,7 +305,7 @@ function StoreCard({ s, groups, reload }) {
             </div>
             <div className="store-games">
               {s.group_name && (live.length
-                ? <><span className="muted small">Shows {live.length} game{live.length === 1 ? '' : 's'} from {s.group_name}:</span> {live.map((g) => <span key={g.id} className="pill">{GAME_TYPES[g.type]?.icon} {g.name}</span>)}</>
+                ? <><span className="muted small">Shows {live.length} game{live.length === 1 ? '' : 's'} from {s.group_name}:</span> {live.map((g) => <span key={g.id} className={`pill ${g.rewards ? '' : 'failed'}`} title={g.rewards ? '' : 'No rewards yet, so it is hidden on the site'}>{GAME_TYPES[g.type]?.icon} {g.name}{g.rewards ? '' : ' (no rewards: hidden)'}</span>)}</>
                 : <span className="muted small">{s.group_name} has no live games yet. Add them on the Games page.</span>)}
             </div>
           </div>
