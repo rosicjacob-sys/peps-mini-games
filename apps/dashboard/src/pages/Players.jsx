@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import { useFilters, FilterBar } from '../filters.jsx';
 import { PageHead } from './Overview.jsx';
-import { fmtInt, fmtDateShort, fmtDateTime, tr, TYPE_LABEL } from '../format.js';
+import { fmtInt, fmtDateShort, fmtDateTime, tr, typeLabel } from '../format.js';
 
 const SORTS = [['last', 'Last played'], ['plays', 'Most plays'], ['first', 'Newest players'], ['email', 'Email A–Z']];
 
@@ -10,19 +10,20 @@ export default function Players({ initial = {}, clearInitial }) {
   const f = useFilters();
   const [search, setSearch] = useState(''); const [q, setQ] = useState('');
   const [sort, setSort] = useState('last'); const [page, setPage] = useState(0);
-  const [data, setData] = useState(null); const [loading, setLoading] = useState(true); const [open, setOpen] = useState(null);
+  const [data, setData] = useState(null); const [loading, setLoading] = useState(true); const [open, setOpen] = useState(null); const [err, setErr] = useState('');
   const [rewardId, setRewardId] = useState(initial.reward_id || '');
   useEffect(() => { const t = setTimeout(() => { setQ(search); setPage(0); }, 300); return () => clearTimeout(t); }, [search]);
   const params = useMemo(() => ({ ...f.params, search: q, sort, page, reward_id: rewardId }), [f.params, q, sort, page, rewardId]);
-  useEffect(() => { setLoading(true); api.players(params).then(setData).finally(() => setLoading(false)); }, [JSON.stringify(params)]);
+  useEffect(() => { setLoading(true); api.players(params).then((d) => { setData(d); setErr(''); }).catch((e) => setErr(e.message)).finally(() => setLoading(false)); }, [JSON.stringify(params)]);
   useEffect(() => setPage(0), [JSON.stringify(f.params)]);
   const pages = data ? Math.ceil(data.total / data.pageSize) : 0;
 
   return (
     <>
       <PageHead title="Players" sub="Everyone who played, with what they won. Test emails are excluded."
-        actions={<button className="ghost" onClick={() => api.download('/players.csv', params, 'players.csv')}>Export players CSV</button>} />
+        actions={<button className="ghost" onClick={() => api.download('/players.csv', params, 'players.csv').catch((e) => setErr(e.message))}>Export players CSV</button>} />
       <FilterBar />
+      {err && <div className="alert bad">{err}</div>}
       <div className="toolbar">
         <div className="search"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.5" /><path d="M11 11l3.5 3.5" stroke="currentColor" strokeWidth="1.5" /></svg>
           <input placeholder="Search email…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search players" /></div>
@@ -46,6 +47,7 @@ export default function Players({ initial = {}, clearInitial }) {
               </tr>
             ))}
             {data && !data.rows.length && <tr><td colSpan="7" className="muted empty">No players match.</td></tr>}
+            {!data && !err && <tr><td colSpan="7" className="muted empty">Loading…</td></tr>}
           </tbody>
         </table></div>
         {pages > 1 && (
@@ -60,15 +62,15 @@ export default function Players({ initial = {}, clearInitial }) {
 }
 
 export function PlayerDrawer({ email, onClose }) {
-  const [d, setD] = useState(null);
-  const load = () => api.player(email).then(setD);
-  useEffect(() => { load(); const k = (e) => e.key === 'Escape' && onClose(); addEventListener('keydown', k); return () => removeEventListener('keydown', k); }, [email]);
+  const [d, setD] = useState(null); const [err, setErr] = useState('');
+  useEffect(() => { api.player(email).then(setD).catch((e) => setErr(e.message)); const k = (e) => e.key === 'Escape' && onClose(); addEventListener('keydown', k); return () => removeEventListener('keydown', k); }, [email]);
   const real = d?.plays.filter((p) => !p.is_test) || [];
   return (
     <div className="drawer-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <aside className="drawer" role="dialog" aria-label={`Player ${email}`}>
         <header className="drawer-head"><div><p className="muted small">Player</p><h2>{email}</h2></div><button className="ghost icon" onClick={onClose} aria-label="Close">✕</button></header>
-        {!d ? <div className="loading">Loading…</div> : (
+        {err && <p className="error">{err}</p>}
+        {!d && !err ? <div className="loading">Loading…</div> : d && (
           <>
             <div className="mini-kpis">
               <div><b>{fmtInt(real.length)}</b><span>plays</span></div>
@@ -81,7 +83,7 @@ export function PlayerDrawer({ email, onClose }) {
                   <div className="tl-when">{fmtDateTime(p.created_at)}</div>
                   <div className="tl-body">
                     <div><b>{p.rewards ? p.rewards.map((x) => tr(x.title)).join(', ') : 'No reward (lost)'}</b> {(p.rewards || []).map((x) => <code key={x.code}>{x.code}</code>)}</div>
-                    <div className="muted small">{TYPE_LABEL[p.type]} · {p.store}{p.store_group ? ` · ${p.store_group}` : ''} · {p.locale.toUpperCase()}</div>
+                    <div className="muted small">{p.game} ({typeLabel(p.type)}) · {p.store}{p.store_group ? ` · ${p.store_group}` : ''} · {p.locale.toUpperCase()}</div>
                     {p.is_test && <div className="tl-status"><span className="pill">test</span></div>}
                   </div>
                 </li>

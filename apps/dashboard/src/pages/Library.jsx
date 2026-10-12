@@ -4,15 +4,16 @@ import { api } from '../api.js';
 import { PageHead } from './Overview.jsx';
 
 const blank = () => ({ title: { en: '', fr: '' }, subtitle: { en: '', fr: '' }, code: '', symbol: '' });
+const where = (g) => `${g.game} · ${g.group}`;
 
 // Rewards entered once and picked by any game. Each game sets its own probability.
 export default function Library() {
-  const [items, setItems] = useState(null); const [editing, setEditing] = useState(null); const [note, setNote] = useState(''); const [q, setQ] = useState('');
-  const load = () => api.library().then(setItems);
+  const [items, setItems] = useState(null); const [editing, setEditing] = useState(null); const [note, setNote] = useState(''); const [q, setQ] = useState(''); const [err, setErr] = useState('');
+  const load = () => api.library().then(setItems).catch((e) => setErr(e.message));
   useEffect(() => { load(); }, []);
   // games using it lose the reward; in each, its odds move to "No reward" so the game still adds up to 100%
   const remove = async (x) => {
-    const names = [...new Set(x.games.map((g) => `${g.game} · ${g.store}`))];
+    const names = [...new Set(x.games.map(where))];
     const used = x.used_in ? `\n\nIt will also be removed from ${names.length === 1 ? 'this game' : `these ${names.length} games`}: ${names.slice(0, 3).join(', ')}${names.length > 3 ? `, +${names.length - 3} more` : ''}. Its chance moves to "No reward" in ${names.length === 1 ? 'that game' : 'each game'}. Adjust the odds in the game's Rewards tab if you want it to go elsewhere.` : '';
     if (!confirm(`Delete "${x.title.en}" from the library?${used}`)) return false;
     try {
@@ -26,6 +27,7 @@ export default function Library() {
     <>
       <PageHead title="Rewards library" sub="Enter each reward once, then add it to any game from the game's Rewards tab. Editing a reward here updates every game that uses it."
         actions={<button className="primary" onClick={() => setEditing('new')}>+ New reward</button>} />
+      {err && <div className="alert bad">{err}</div>}
       {note && <div className="alert info">{note}</div>}
       {editing === 'new' && <LibForm onCancel={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
       {items && items.length > 0 && (
@@ -33,6 +35,7 @@ export default function Library() {
           <input placeholder="Search rewards or codes…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search rewards" /></div>
           <span className="muted push">{items.length} reward{items.length === 1 ? '' : 's'}</span></div>
       )}
+      {!items && !err && <div className="loading">Loading…</div>}
       <div className="lib-grid">
         {list.map((x) => editing === x.id
           ? <LibForm key={x.id} item={x} onDelete={() => remove(x)} onCancel={() => setEditing(null)} onSaved={(r) => { setEditing(null); setNote(r?.games_updated ? `Saved. ${r.games_updated} game reward${r.games_updated === 1 ? '' : 's'} updated.` : 'Saved.'); load(); }} />
@@ -44,7 +47,7 @@ export default function Library() {
               </div>
               {x.subtitle?.en && <p className="muted small">{x.subtitle.en}</p>}
               <div className="lib-meta"><code>{x.code}</code><span className="muted small">{x.used_in ? `Used in ${x.used_in} game${x.used_in === 1 ? '' : 's'}` : 'Not used yet'}</span></div>
-              {x.used_in > 0 && <p className="muted small lib-games">{x.games.map((g) => `${g.game} · ${g.store}`).join(', ')}</p>}
+              {x.used_in > 0 && <p className="muted small lib-games" title={x.games.map(where).join(', ')}>{x.games.map(where).join(', ')}</p>}
               <div className="lib-actions"><button className="ghost small danger" onClick={() => remove(x)}>Delete</button><button className="ghost small" onClick={() => setEditing(x.id)}>Edit</button></div>
             </article>
           ))}
