@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from './api.js';
 import Overview from './pages/Overview.jsx';
-import { GAME_TYPES, THEMES, CATEGORIES, INTRO_DEFAULTS, UI, themeFor, themeCategory, categoryOf, t, singleReward } from '@peps/shared';
+import { GAME_TYPES, THEMES, CATEGORIES, INTRO_DEFAULTS, UI, themeFor, gameTheme, themeCategory, categoryOf, t, singleReward } from '@peps/shared';
 import { pokerTiers, COLORS } from '@peps/shared/cards.js';
 
 const TABS = ['Stats', 'Rewards', 'Intro popup', 'Appearance', 'Texts & Email'];
@@ -14,7 +14,7 @@ export default function GameEditor({ id, back }) {
   return (
     <>
       <button className="link back" onClick={back}>← All games</button>
-      <div className="page-head"><div><h1>{game.name}</h1><p className="muted">{GAME_TYPES[game.type]?.label} · {game.store_name}{game.group_name ? ` · ${game.group_name}` : ''} · <span className={`pill ${game.status}`}>{game.status === 'active' ? 'Live' : 'Paused'}</span></p></div></div>
+      <div className="page-head"><div><h1>{game.name}</h1><p className="muted">{GAME_TYPES[game.type]?.label} · group <b>{game.group_name}</b>, shown on {game.store_names?.length ? game.store_names.join(', ') : 'no stores yet'} · <span className={`pill ${game.status}`}>{game.status === 'active' ? 'Live' : 'Paused'}</span></p></div></div>
       <div className="tabs">{TABS.map((x) => <button key={x} className={tab === x ? 'on' : ''} onClick={() => setTab(x)}>{x}</button>)}</div>
       {tab === 'Rewards' && <Rewards game={game} reload={load} />}
       {tab === 'Stats' && <Overview scope={scope} />}
@@ -146,6 +146,39 @@ function ReminderPreview({ gameId }) {
   );
 }
 
+// Arcade "Match my website": a main colour (and an optional second for the gradient), with colours read from the
+// store's homepage offered as one-click swatches.
+function SiteColors({ gameId, colors, onChange }) {
+  const [found, setFound] = useState(null); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
+  async function detect() {
+    setBusy(true); setErr('');
+    try { setFound(await api.siteColors(gameId)); } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
+  return (
+    <div className="site-colors">
+      <p className="muted small">The banner, outlines and titles use your colours; text shades are adjusted automatically so everything stays readable.</p>
+      <div className="row">
+        <label>Main colour<input type="color" value={colors.main || '#7b3ff2'} onChange={(e) => onChange({ main: e.target.value })} /></label>
+        <label>Second colour <span className="muted">(gradient end)</span>
+          <span className="row tight"><input type="color" value={colors.second || colors.main || '#7b3ff2'} onChange={(e) => onChange({ second: e.target.value })} />
+            {colors.second ? <button className="link" onClick={() => onChange({ second: '' })}>Auto</button> : <span className="muted small">Auto (a darker shade)</span>}</span></label>
+        <button className="ghost" disabled={busy} onClick={detect}>{busy ? 'Reading your website…' : 'Detect from my website'}</button>
+      </div>
+      {err && <p className="error">{err}</p>}
+      {found && (found.colors.length ? (
+        <div className="found-colors">
+          <span className="muted small">Colours on {found.url}:</span>
+          {found.colors.map((c) => (
+            <span key={c} className="found-colour"><i style={{ background: c }} /><code>{c}</code>
+              <button className="ghost small" onClick={() => onChange({ main: c })}>Main</button>
+              <button className="ghost small" onClick={() => onChange({ second: c })}>2nd</button></span>
+          ))}
+        </div>
+      ) : <p className="muted small">No clear brand colours found on {found.url}. Pick them with the colour boxes above.</p>)}
+    </div>
+  );
+}
+
 function Settings({ game, reload, section, back }) {
   const [g, setG] = useState({ ...game, texts: { heading: {}, subheading: {}, privacy: {}, triggerLabel: {}, privacyUrl: '', ...game.texts } });
   const [msg, setMsg] = useState(''); const [err, setErr] = useState('');
@@ -155,8 +188,10 @@ function Settings({ game, reload, section, back }) {
     setErr(''); setMsg('');
     try { await api.updateGame(g.id, g); setMsg('Saved'); reload(); } catch (e) { setErr(e.message); }
   }
-  const th = themeFor(g.type, g.theme);
+  const th = gameTheme(g);
   const cat = categoryOf(g.type);
+  const colors = { mode: 'theme', main: '', second: '', ...g.texts.colors };
+  const site = cat === 'arcade' && colors.mode === 'site';
   return (
     <div className="card form">
       {section === 'appearance' && (
@@ -166,12 +201,19 @@ function Settings({ game, reload, section, back }) {
             {g.type === 'wheel' && <label>Rewards per play<input className="num-in" type="number" min="1" max="5" value={g.rewards_per_play} onChange={(e) => setG({ ...g, rewards_per_play: e.target.value })} /></label>}
             <label className="grow">Internal name<input value={g.name} onChange={(e) => setG({ ...g, name: e.target.value })} /></label>
           </div>
-          <h3>{CATEGORIES[cat].label.en} theme</h3>
-          {fixed ? <p className="muted">Blackjack keeps its signature purple-and-gold theme.</p> : (
+          <h3>{cat === 'arcade' ? 'Colours' : `${CATEGORIES[cat].label.en} theme`}</h3>
+          {cat === 'arcade' && (
+            <div className="segmented colour-mode" role="radiogroup" aria-label="Colours">
+              <button role="radio" aria-checked={!site} className={!site ? 'on' : ''} onClick={() => setT('colors', { ...colors, mode: 'theme' })}>Arcade palette</button>
+              <button role="radio" aria-checked={site} className={site ? 'on' : ''} onClick={() => setT('colors', { ...colors, mode: 'site', main: colors.main || th.grad?.[0] || '#7b3ff2' })}>Match my website</button>
+            </div>
+          )}
+          {site && <SiteColors gameId={g.id} colors={colors} onChange={(c) => setT('colors', { ...colors, ...c })} />}
+          {fixed ? <p className="muted">Blackjack keeps its signature purple-and-gold theme.</p> : !site && (
             <>
               <div className="themes">
                 {Object.entries(THEMES).filter(([k, v]) => !v.locked && themeCategory(k) === cat).map(([k, v]) => (
-                  <button key={k} className={`swatch ${th === v ? 'on' : ''}`} onClick={() => setG({ ...g, theme: k })}
+                  <button key={k} className={`swatch ${themeFor(g.type, g.theme) === v ? 'on' : ''}`} onClick={() => setG({ ...g, theme: k })}
                     style={v.grad ? { background: `linear-gradient(135deg, ${v.grad[0]}, ${v.grad[1]})`, color: '#fff', borderColor: '#fff', textShadow: '0 1px 2px rgba(0,0,0,.35)' } : { background: v.bg, color: v.text, borderColor: v.border }}>
                     <i style={{ background: v.accent }} /><i style={{ background: v.grad ? v.bg : v.slices[1] }} /><span>{v.label}</span>
                   </button>
@@ -184,7 +226,14 @@ function Settings({ game, reload, section, back }) {
               </div>
             </>
           )}
-          <div className="preview" style={{ background: th.grad ? `linear-gradient(135deg, ${th.grad[0]}, ${th.grad[1]})` : th.bg, color: th.grad ? '#fff' : th.text, borderColor: th.border }}>
+          {site && (
+            <div className="row">
+              <label>Button colour <span className="muted">(optional; the yellow default suits most sites)</span>
+                <input type="color" value={g.brand_accent || th.accent} onChange={(e) => setG({ ...g, brand_accent: e.target.value })} /></label>
+              {g.brand_accent && <button className="link" onClick={() => setG({ ...g, brand_accent: null })}>Reset</button>}
+            </div>
+          )}
+          <div className="preview" style={{ background: th.grad ? `linear-gradient(135deg, ${th.grad[0]}, ${th.grad[1]})` : th.bg, color: th.grad ? th.onGrad || '#fff' : th.text, borderColor: th.border }}>
             <b>Preview</b>
             <div className="chip" style={{ background: (!fixed && g.brand_accent) || th.accent, color: th.accentText }}>Play & Win</div>
             <div className="chip" style={{ background: th.surface, border: `1px solid ${th.border}`, color: th.text }}>Free Reta</div>

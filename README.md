@@ -12,8 +12,13 @@ render.yaml      Render Blueprint
 ```
 
 ## How it works
-- **Store groups** (e.g. Lexar, Can Peps, Peps USA) are created in the dashboard; each store is assigned to one. A group
-  carries the default Resend sender (From name / email / reply-to) for every game in its stores; a game can override it.
+- **Store groups** (e.g. Lexar, Can Peps, Peps USA) are created in the dashboard; each store is assigned to one.
+  **Games belong to a group**: every store in the group shows them, so adding a store needs no game setup (pick its
+  group, list its website, paste the install line). A group also carries the default Resend sender (From name / email /
+  reply-to) for its games; a game can override it. Plays, the weekly limit, reports and reminders stay per store.
+- **One install line for every store**: `<script src=".../widget.js" data-locale="{{ request.locale.iso_code }}" defer>`.
+  The API finds the store from the page's website (the store's listed websites; each can belong to one store).
+  `data-store="<key>"` still works and is needed only for a store with no website listed.
 - **Rewards library**: rewards (EN/FR title + subtitle, code, slot icon) are entered once and added to any game; each
   game sets only the probability. Editing a library reward updates every game using it. "Import from my games" turns
   rewards already typed into games into library entries and links them. One-off rewards can still be custom per game.
@@ -73,8 +78,10 @@ Optional attributes on the `<script>` tag:
 1. Render → **New → Blueprint** → select this repo. It creates the database, API, dashboard and widget.
 2. Fill the prompted env vars: `DASHBOARD_PASSWORD`, `RESEND_API_KEY`, `DASHBOARD_ORIGIN` (dashboard URL),
    and `VITE_API_URL` for both static sites (the API URL, e.g. `https://peps-games-api.onrender.com`).
-3. Dashboard → **Stores** → add a store, copy its snippet into `theme.liquid` before `</body>`.
-4. Dashboard → **Games** → create a game, set rewards/odds, texts, from-email, theme.
+3. Dashboard → **Store groups** → create the groups; **Games** → create games for a group, set rewards/odds, texts,
+   from-email, theme.
+4. Dashboard → **Stores** → add each store (its group + website), paste the shared install line into `theme.liquid`
+   before `</body>`.
    Verify the from-domain in Resend.
 
 Changing a `VITE_*` var needs a redeploy of that static site.

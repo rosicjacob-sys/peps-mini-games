@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { UI, INTRO_DEFAULTS, LOCALES, pickLocale, t, themeFor, GAME_TYPES, METALS, CATEGORIES, POPS, categoryOf } from '@peps/shared';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { UI, INTRO_DEFAULTS, LOCALES, pickLocale, t, gameTheme, GAME_TYPES, METALS, CATEGORIES, POPS, categoryOf } from '@peps/shared';
 import Wheel from './games/Wheel.jsx';
 import Blackjack from './games/Blackjack.jsx';
 import Slots from './games/Slots.jsx';
@@ -18,7 +18,7 @@ const GAMES = { wheel: [Wheel], blackjack: [Blackjack, Wheel], slots: [Slots], c
   scratch: [ScratchCard], gifts: [GiftBoxes], plinko: [Plinko], spin: [Wheel] };
 
 function cssVars(game) {
-  const th = themeFor(game.type, game.theme);
+  const th = gameTheme(game);
   const accent = (!GAME_TYPES[game.type]?.fixedTheme && game.brandAccent) || th.accent;
   const rim = th.rim || accent;
   return {
@@ -30,8 +30,8 @@ function cssVars(game) {
     // headline fill: the theme's polished metal (gold, copper or silver), else the flat rim colour
     '--marquee': METALS[th.marquee] || `linear-gradient(${rim},${rim})`,
     // arcade: the header gradient and the bright pieces
-    ...(th.grad ? { '--grad1': th.grad[0], '--grad2': th.grad[1] } : {}),
-    ...Object.fromEntries(POPS.flatMap((p, i) => [[`--pop${i + 1}`, p.bg], [`--pop${i + 1}-fg`, p.fg]])),
+    ...(th.grad ? { '--grad1': th.grad[0], '--grad2': th.grad[1], '--on-grad': th.onGrad || '#fff' } : {}),
+    ...Object.fromEntries((th.pops || POPS).flatMap((p, i) => [[`--pop${i + 1}`, p.bg], [`--pop${i + 1}-fg`, p.fg]])),
   };
 }
 
@@ -245,6 +245,9 @@ function Play({ game, arcade, api, store, locale, onClose, onBack, onUnavailable
   const heading = t(game.texts?.heading, locale) || game.name;
   const sub = t(game.texts?.subheading, locale);
   const privacy = t(game.texts?.privacy, locale);
+  // every new screen (email, game, result) starts at the top of the window
+  const top = useRef(null);
+  useEffect(() => { top.current?.closest('.modal')?.scrollTo(0, 0); }, [stage, done, !!result]);
   useEffect(() => { if (done && result && !result.lost) sound.play('congrats'); }, [done]);
 
   async function submit(e) {
@@ -274,7 +277,7 @@ function Play({ game, arcade, api, store, locale, onClose, onBack, onUnavailable
 
   if (!result) {
     return (
-      <form className="screen gate" onSubmit={submit}>
+      <form ref={top} className="screen gate" onSubmit={submit}>
         {onBack && !arcade && <button type="button" className="back-link" onClick={onBack}>← {ui.otherGames}</button>}
         <Head arcade={arcade} title={heading} suits />
         {onBack && arcade && <button type="button" className="back-link" onClick={onBack}>← {ui.otherGames}</button>}
@@ -296,11 +299,11 @@ function Play({ game, arcade, api, store, locale, onClose, onBack, onUnavailable
     const Stage = stages[stage];
     const next = () => (!result.lost && stage + 1 < stages.length ? setStage(stage + 1) : setDone(true));
     // a wheel that follows another stage gets its own heading
-    return <div className="screen"><Head arcade={arcade} bulbs={false} title={stage > 0 ? ui.spinHeading : heading} /><Stage key={stage} game={game} result={result} locale={locale} onDone={next} /></div>;
+    return <div ref={top} className="screen"><Head arcade={arcade} bulbs={false} title={stage > 0 ? ui.spinHeading : heading} /><Stage key={stage} game={game} result={result} locale={locale} onDone={next} /></div>;
   }
 
   if (result.lost) return (
-    <div className="screen result lose">
+    <div ref={top} className="screen result lose">
       <Head arcade={arcade} title={ui.lose.title} />
       <div className="lose-card">
         <p className="lose-when">{ui.lose.retry} <b>{result.nextPlayText}</b>.</p>
@@ -311,7 +314,7 @@ function Play({ game, arcade, api, store, locale, onClose, onBack, onUnavailable
   );
 
   return (
-    <div className="screen result">
+    <div ref={top} className="screen result">
       <Confetti />
       <Head arcade={arcade} className="congrats" title={ui.congrats} />
       <p className="muted won">{result.rewards.length > 1 ? ui.yourRewards : ui.yourReward}</p>

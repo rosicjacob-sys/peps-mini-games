@@ -47,6 +47,7 @@ export const api = {
   reminders: (f) => req(`/reminders?${qs(f)}`),
   resendReminder: (id) => req(`/reminders/${id}/resend`, { method: 'POST' }),
   runReminders: () => req('/reminders/run', { method: 'POST' }),
+  siteColors: (gameId) => req(`/games/${gameId}/site-colors`),
   previewReminder: (gameId, locale) => req(`/reminders/preview?game_id=${gameId}&locale=${locale}`),
   async download(path, f, filename) {
     const res = await fetch(`${BASE}/api/admin${path}?${qs(f)}`, { headers: { Authorization: `Bearer ${token}` } });

@@ -81,6 +81,35 @@ export const symbolFor = (reward, index) => reward.symbol || SLOT_SYMBOLS[index 
 
 export const DEFAULT_THEME = 'emerald';
 
+// ---- "Match my website" colours for arcade games: one or two brand colours become the banner gradient, with
+// readable shades worked out automatically (outlines dark enough on white, banner text dark if the colour is light)
+const HEX = /^#[0-9a-f]{6}$/i;
+const rgbOf = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const hexOf = (c) => `#${c.map((v) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('')}`;
+const mixHex = (a, b, t) => { const x = rgbOf(a), y = rgbOf(b); return hexOf(x.map((v, i) => v + (y[i] - v) * t)); };
+export const luminance = (h) => { const f = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }; const [r, g, b] = rgbOf(h).map(f); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+export const contrast = (a, b) => { const [x, y] = [luminance(a), luminance(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+const darkenTo = (h, against, min) => { let c = h; for (let k = 0; k < 20 && contrast(c, against) < min; k++) c = mixHex(c, '#000000', 0.12); return c; };
+export const isHex = (v) => HEX.test(String(v || ''));
+export function siteTheme(th, colors) {
+  const main = colors.main.toLowerCase();
+  const second = isHex(colors.second) ? colors.second.toLowerCase() : mixHex(main, '#000000', 0.28);
+  const ink = '#1f1a2e';
+  // white text on the banner when it reads well enough on both ends of the gradient, otherwise dark text
+  const onGrad = Math.min(contrast('#ffffff', main), contrast('#ffffff', second)) >= 2.6 ? '#ffffff' : ink;
+  // game pieces (wheel slices, gift boxes, Plinko slots): shades of the two colours, each with a readable label colour
+  const pops = [main, mixHex(second, '#ffffff', 0.55), second, mixHex(main, '#ffffff', 0.55), mixHex(main, '#000000', 0.3), mixHex(second, '#ffffff', 0.3)]
+    .map((bg) => ({ bg, fg: contrast(bg, '#ffffff') >= 4.5 ? '#ffffff' : ink }));
+  return { ...th, label: 'My website colours', grad: [main, second], onGrad, pops,
+    rim: darkenTo(second, '#ffffff', 4.5), bg: mixHex(main, '#ffffff', 0.94), border: mixHex(main, '#ffffff', 0.8), text: ink, muted: '#5b5670' };
+}
+// the theme a game actually shows: its palette, or its website colours when an arcade game is set to match them
+export function gameTheme(game) {
+  const th = themeFor(game.type, game.theme);
+  const c = game.texts?.colors;
+  return categoryOf(game.type) === 'arcade' && c?.mode === 'site' && isHex(c.main) ? siteTheme(th, c) : th;
+}
+
 export function themeFor(type, themeKey) {
   const g = GAME_TYPES[type] || {};
   const ok = (k) => THEMES[k] && themeCategory(k) === (g.category || 'casino');

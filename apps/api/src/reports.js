@@ -10,7 +10,8 @@ const ZONE = 'America/Toronto';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-const BASE = `FROM plays p JOIN games g ON g.id = p.game_id JOIN stores s ON s.id = g.store_id LEFT JOIN store_groups sg ON sg.id = s.group_id`;
+// a play's store is where it happened (a game is shared by its group's stores)
+const BASE = `FROM plays p JOIN games g ON g.id = p.game_id JOIN stores s ON s.id = p.store_id LEFT JOIN store_groups sg ON sg.id = s.group_id`;
 const ET = `'${ZONE}'`;
 const dayStart = (n) => `($${n}::date::timestamp AT TIME ZONE ${ET})`;
 const dayEnd = (n) => `(($${n}::date + 1)::timestamp AT TIME ZONE ${ET})`;
@@ -31,7 +32,7 @@ function scope(qs, params, { withTest = false } = {}) {
   const w = withTest ? [] : ['NOT p.is_test'];
   if (UUID.test(qs.group_id || '')) { params.push(qs.group_id); w.push(`s.group_id = $${params.length}`); }
   if (qs.group_id === 'none') w.push('s.group_id IS NULL');
-  if (UUID.test(qs.store_id || '')) { params.push(qs.store_id); w.push(`g.store_id = $${params.length}`); }
+  if (UUID.test(qs.store_id || '')) { params.push(qs.store_id); w.push(`p.store_id = $${params.length}`); }
   if (UUID.test(qs.game_id || '')) { params.push(qs.game_id); w.push(`p.game_id = $${params.length}`); }
   return w;
 }

@@ -47,7 +47,9 @@ export function FilterBar({ lockGame, extra }) {
   const ref = useRef();
   useEffect(() => { const h = (e) => ref.current && !ref.current.contains(e.target) && setOpen(false); document.addEventListener('pointerdown', h); return () => document.removeEventListener('pointerdown', h); }, []);
   const storeOpts = stores.filter((s) => !f.dims.group_id || (f.dims.group_id === 'none' ? !s.group_id : s.group_id === f.dims.group_id));
-  const gameOpts = games.filter((g) => (f.dims.store_id ? g.store_id === f.dims.store_id : storeOpts.some((s) => s.id === g.store_id)));
+  // a store shows its group's games
+  const pickedStore = stores.find((s) => s.id === f.dims.store_id);
+  const gameOpts = games.filter((g) => (pickedStore ? g.group_id === pickedStore.group_id : !f.dims.group_id || f.dims.group_id === 'none' ? true : g.group_id === f.dims.group_id));
   const label = f.preset === 'custom' ? fmtRange(f.params.from, f.params.to) : PRESETS.find((p) => p.key === f.preset).label;
   const set = (k, v) => {
     const d = { ...f.dims, [k]: v };
@@ -94,7 +96,7 @@ export function FilterBar({ lockGame, extra }) {
           </select>
           <select className="fb-select" aria-label="Game" value={f.dims.game_id} onChange={(e) => set('game_id', e.target.value)}>
             <option value="">All games</option>
-            {gameOpts.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.store_name}</option>)}
+            {gameOpts.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.group_name}</option>)}
           </select>
           {active && <button className="link" onClick={() => f.setDims({ group_id: '', store_id: '', game_id: '' })}>Clear filters</button>}
         </>

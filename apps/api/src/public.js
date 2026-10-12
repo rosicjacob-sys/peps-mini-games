@@ -16,8 +16,15 @@ publicRouter.use(cors({ origin: true }));
 // per-IP plays per minute (PLAY_RATE_LIMIT to change)
 const playLimiter = rateLimit({ windowMs: 60_000, limit: Number(process.env.PLAY_RATE_LIMIT) || 20, standardHeaders: true, legacyHeaders: false });
 
+// The store a request is for. With a key (data-store on the install line), that store, if the page's website is
+// allowed. Without one (the shared install line), the store whose allowed websites include the page's website.
 async function storeByKey(key, origin) {
-  const { rows } = await q('SELECT * FROM stores WHERE public_key = $1', [String(key || '')]);
+  if (!key) {
+    if (!origin) return null;
+    const { rows } = await q('SELECT * FROM stores WHERE $1 = ANY(allowed_origins) ORDER BY created_at LIMIT 1', [String(origin).replace(/\/$/, '')]);
+    return rows[0] || null;
+  }
+  const { rows } = await q('SELECT * FROM stores WHERE public_key = $1', [String(key)]);
   const store = rows[0];
   if (!store) return null;
   if (store.allowed_origins.length && origin && !store.allowed_origins.includes(origin)) return null;
@@ -35,7 +42,8 @@ const publicGame = (g, rewards) => { const tiers = g.type === 'poker' ? pokerTie
 publicRouter.get('/config', async (req, res) => {
   const store = await storeByKey(req.query.key, req.get('origin'));
   if (!store) return res.status(404).json({ error: 'unknown_store' });
-  const { rows: games } = await q("SELECT * FROM games WHERE store_id = $1 AND status = 'active' ORDER BY created_at", [store.id]);
+  // a store shows its group's live games
+  const { rows: games } = await q("SELECT * FROM games WHERE group_id = $1 AND status = 'active' ORDER BY created_at", [store.group_id]);
   const out = [];
   for (const g of games) {
     const { rows: rewards } = await q('SELECT id, title, subtitle, symbol, probability, sort FROM rewards WHERE game_id = $1 AND active ORDER BY sort, id', [g.id]);
@@ -55,8 +63,8 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
   if (!mail) return res.status(400).json({ error: 'invalid_email' });
 
   const { rows: [game] } = await q(`SELECT g.*, sg.from_name AS group_from_name, sg.from_email AS group_from_email, sg.reply_to AS group_reply_to
-    FROM games g JOIN stores s ON s.id = g.store_id LEFT JOIN store_groups sg ON sg.id = s.group_id
-    WHERE g.id = $1 AND g.store_id = $2 AND g.status = 'active'`, [gameId, store.id]);
+    FROM games g JOIN store_groups sg ON sg.id = g.group_id
+    WHERE g.id = $1 AND g.group_id = $2 AND g.status = 'active'`, [gameId, store.group_id]);
   if (!game || !GAME_TYPES[game.type]) return res.status(404).json({ error: 'game_unavailable' });
   const { rows: rewards } = await q('SELECT * FROM rewards WHERE game_id = $1 AND active ORDER BY sort, id', [game.id]);
   // first roll: does this play win nothing? (lose_percent of 100; the rewards share the rest)
@@ -77,13 +85,13 @@ publicRouter.post('/play', playLimiter, async (req, res) => {
     // The lock makes two simultaneous plays with the same email wait for each other.
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`${store.id}|${mail.norm}|${weekKey}`]);
     const { rowCount: playedHere } = await client.query(
-      'SELECT 1 FROM plays p JOIN games g ON g.id = p.game_id WHERE g.store_id = $1 AND p.email_norm = $2 AND p.week_key = $3 LIMIT 1',
+      'SELECT 1 FROM plays p WHERE p.store_id = $1 AND p.email_norm = $2 AND p.week_key = $3 LIMIT 1',
       [store.id, mail.norm, weekKey]);
     if (playedHere) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'already_played', email: mail.email, nextPlayAt: week.nextPlayAt, nextPlayText: formatDate(week.nextPlayAt, locale) }); }
     const ins = await client.query(
-      `INSERT INTO plays (game_id, email, email_norm, week_key, locale, ip_hash, is_test, email_status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (game_id, email_norm, week_key) DO NOTHING RETURNING id`,
-      [game.id, mail.email, mail.norm, weekKey, locale, hashIp(req.ip), test, 'skipped']);
+      `INSERT INTO plays (game_id, store_id, email, email_norm, week_key, locale, ip_hash, is_test, email_status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+      [game.id, store.id, mail.email, mail.norm, weekKey, locale, hashIp(req.ip), test, 'skipped']);
     if (!ins.rowCount) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'already_played', email: mail.email, nextPlayAt: week.nextPlayAt, nextPlayText: formatDate(week.nextPlayAt, locale) }); }
     playId = ins.rows[0].id;
     for (const r of picks) {

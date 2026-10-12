@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
-import { GAME_TYPES, THEMES, SLOT_SYMBOLS, DEFAULT_THEME, ICON_TYPES, singleReward, themeCategory } from '@peps/shared';
+import { GAME_TYPES, THEMES, SLOT_SYMBOLS, DEFAULT_THEME, ICON_TYPES, singleReward, themeCategory, isHex } from '@peps/shared';
 import { q, pool } from './db.js';
 
 export const adminRouter = Router();
@@ -38,7 +38,8 @@ function cleanIntro(i = {}) {
 // ---- store groups
 const groupFields = (b) => [String(b.name || '').trim().slice(0, 80) || 'Untitled group', String(b.from_name || '').slice(0, 120), String(b.from_email || '').trim().slice(0, 254), String(b.reply_to || '').trim().slice(0, 254)];
 adminRouter.get('/groups', wrap(async (_req, res) => {
-  const { rows } = await q(`SELECT g.*, (SELECT count(*)::int FROM stores s WHERE s.group_id = g.id) AS store_count FROM store_groups g ORDER BY g.sort, g.created_at`);
+  const { rows } = await q(`SELECT g.*, (SELECT count(*)::int FROM stores s WHERE s.group_id = g.id) AS store_count,
+      (SELECT count(*)::int FROM games x WHERE x.group_id = g.id) AS game_count FROM store_groups g ORDER BY g.sort, g.created_at`);
   res.json(rows);
 }));
 adminRouter.post('/groups', wrap(async (req, res) => {
@@ -49,23 +50,42 @@ adminRouter.put('/groups/:id', wrap(async (req, res) => {
   const { rows } = await q('UPDATE store_groups SET name=$2, from_name=$3, from_email=$4, reply_to=$5 WHERE id=$1 RETURNING *', [req.params.id, ...groupFields(req.body)]);
   rows[0] ? res.json(rows[0]) : res.sendStatus(404);
 }));
-// Deleting a group keeps its stores (they become ungrouped).
-adminRouter.delete('/groups/:id', wrap(async (req, res) => { await q('DELETE FROM store_groups WHERE id = $1', [req.params.id]); res.sendStatus(204); }));
+// Deleting a group keeps its stores (they become ungrouped). A group that still has games can't be deleted:
+// its games (and their plays) would go with it.
+adminRouter.delete('/groups/:id', wrap(async (req, res) => {
+  const { rows: [c] } = await q('SELECT count(*)::int AS n FROM games WHERE group_id = $1', [req.params.id]);
+  if (c.n) return res.status(409).json({ error: `This group has ${c.n} game${c.n === 1 ? '' : 's'}. Delete or move them first.` });
+  await q('DELETE FROM store_groups WHERE id = $1', [req.params.id]); res.sendStatus(204);
+}));
 
 // ---- stores
 adminRouter.get('/stores', wrap(async (_req, res) => {
-  const { rows } = await q(`SELECT s.*, sg.name AS group_name, (SELECT count(*)::int FROM games g WHERE g.store_id = s.id) AS game_count FROM stores s LEFT JOIN store_groups sg ON sg.id = s.group_id ORDER BY sg.sort, sg.name NULLS LAST, s.created_at`);
+  // a store shows its group's games
+  const { rows } = await q(`SELECT s.*, sg.name AS group_name,
+      coalesce((SELECT json_agg(json_build_object('id', g.id, 'name', g.name, 'type', g.type, 'status', g.status) ORDER BY g.created_at) FROM games g WHERE g.group_id = s.group_id), '[]') AS games
+    FROM stores s LEFT JOIN store_groups sg ON sg.id = s.group_id ORDER BY sg.sort, sg.name NULLS LAST, s.created_at`);
+  for (const s of rows) s.game_count = s.games.length;
   res.json(rows);
 }));
 // the store's website, used for the "Play now" button in reminder emails (http(s) only)
 const siteUrl = (v) => { try { const u = new URL(String(v || '').trim()); return /^https?:$/.test(u.protocol) ? u.toString().slice(0, 300) : null; } catch { return null; } };
+// the shared install line finds a store by its website, so a website can belong to one store only
+async function originsTaken(origins, storeId) {
+  if (!origins.length) return null;
+  const { rows } = await q('SELECT name, allowed_origins FROM stores WHERE allowed_origins && $1::text[] AND ($2::uuid IS NULL OR id <> $2)', [origins, storeId || null]);
+  if (!rows[0]) return null;
+  const dup = origins.find((o) => rows[0].allowed_origins.includes(o));
+  return `${dup} is already used by the store "${rows[0].name}".`;
+}
 adminRouter.post('/stores', wrap(async (req, res) => {
   const origins = (req.body.allowed_origins || []).map((o) => String(o).trim().replace(/\/$/, '')).filter(Boolean);
+  const taken = await originsTaken(origins); if (taken) return res.status(400).json({ error: taken });
   const { rows } = await q('INSERT INTO stores (name, allowed_origins, group_id, site_url) VALUES ($1,$2,$3,$4) RETURNING *', [String(req.body.name || '').trim() || 'Untitled store', origins, req.body.group_id || null, siteUrl(req.body.site_url)]);
   res.status(201).json(rows[0]);
 }));
 adminRouter.put('/stores/:id', wrap(async (req, res) => {
   const origins = (req.body.allowed_origins || []).map((o) => String(o).trim().replace(/\/$/, '')).filter(Boolean);
+  const taken = await originsTaken(origins, req.params.id); if (taken) return res.status(400).json({ error: taken });
   const { rows } = await q('UPDATE stores SET name = $2, allowed_origins = $3, group_id = $4, site_url = $5 WHERE id = $1 RETURNING *', [req.params.id, String(req.body.name || '').trim(), origins, req.body.group_id || null, siteUrl(req.body.site_url)]);
   rows[0] ? res.json(rows[0]) : res.sendStatus(404);
 }));
@@ -74,19 +94,53 @@ adminRouter.delete('/stores/:id', wrap(async (req, res) => { await q('DELETE FRO
 // ---- games
 adminRouter.get('/games', wrap(async (req, res) => {
   const { rows } = await q(`
-    SELECT g.*, s.name AS store_name, s.public_key, sg.id AS group_id, sg.name AS group_name,
+    SELECT g.*, sg.name AS group_name,
+      (SELECT count(*)::int FROM stores s WHERE s.group_id = g.group_id) AS store_count,
       (SELECT count(*)::int FROM plays p WHERE p.game_id = g.id AND NOT p.is_test) AS play_count
-    FROM games g JOIN stores s ON s.id = g.store_id LEFT JOIN store_groups sg ON sg.id = s.group_id
-    WHERE ($1::uuid IS NULL OR g.store_id = $1) ORDER BY sg.sort, sg.name NULLS LAST, s.name, g.created_at`, [req.query.store_id || null]);
+    FROM games g LEFT JOIN store_groups sg ON sg.id = g.group_id
+    WHERE ($1::uuid IS NULL OR g.group_id = $1) AND ($2::uuid IS NULL OR g.group_id = (SELECT group_id FROM stores WHERE id = $2))
+    ORDER BY sg.sort, sg.name NULLS LAST, g.created_at`, [req.query.group_id || null, req.query.store_id || null]);
   res.json(rows);
 }));
 adminRouter.get('/games/:id', wrap(async (req, res) => {
-  const { rows: [g] } = await q(`SELECT g.*, s.public_key, s.name AS store_name, sg.name AS group_name,
-      sg.from_name AS group_from_name, sg.from_email AS group_from_email, sg.reply_to AS group_reply_to
-    FROM games g JOIN stores s ON s.id = g.store_id LEFT JOIN store_groups sg ON sg.id = s.group_id WHERE g.id = $1`, [req.params.id]);
+  const { rows: [g] } = await q(`SELECT g.*, sg.name AS group_name,
+      sg.from_name AS group_from_name, sg.from_email AS group_from_email, sg.reply_to AS group_reply_to,
+      coalesce((SELECT array_agg(s.name ORDER BY s.created_at) FROM stores s WHERE s.group_id = g.group_id), '{}') AS store_names
+    FROM games g LEFT JOIN store_groups sg ON sg.id = g.group_id WHERE g.id = $1`, [req.params.id]);
   if (!g) return res.sendStatus(404);
   const { rows: rewards } = await q('SELECT * FROM rewards WHERE game_id = $1 ORDER BY sort, id', [g.id]);
   res.json({ ...g, rewards, effective_sender: resolveSender(g) });
+}));
+
+// "Detect from my website": read the homepage of a store in the game's group and suggest the colours its theme uses
+// most (theme-color meta, CSS colour variables, inline styles), leaving out greys, near-white and near-black.
+const toHex = (r, g, b) => `#${[r, g, b].map((v) => Math.max(0, Math.min(255, Number(v))).toString(16).padStart(2, '0')).join('')}`;
+function colourful(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+  const sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  return sat > 0.25 && l > 0.12 && l < 0.88;
+}
+adminRouter.get('/games/:id/site-colors', wrap(async (req, res) => {
+  const { rows: [st] } = await q(`SELECT s.name, s.site_url, s.allowed_origins FROM games g JOIN stores s ON s.group_id = g.group_id
+    WHERE g.id = $1 AND (s.site_url IS NOT NULL OR cardinality(s.allowed_origins) > 0) ORDER BY s.created_at LIMIT 1`, [req.params.id]);
+  const url = st && (st.site_url || st.allowed_origins[0]);
+  if (!url) return res.status(400).json({ error: 'No store in this group has a website listed yet (Stores → Edit).' });
+  let html = '';
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'Mozilla/5.0 (peps-games colour check)' }, redirect: 'follow' });
+    html = (await r.text()).slice(0, 3_000_000);
+  } catch (e) { return res.status(502).json({ error: `Could not open ${url} (${e.name === 'TimeoutError' ? 'timed out' : e.message}).` }); }
+  const counts = new Map(); const add = (hex, w = 1) => { hex = hex.toLowerCase(); if (colourful(hex)) counts.set(hex, (counts.get(hex) || 0) + w); };
+  const meta = html.match(/<meta[^>]+name=["']theme-color["'][^>]*content=["'](#[0-9a-f]{6})/i)?.[1];
+  if (meta) add(meta, 50);
+  // CSS colour variables count more than ordinary colours (they are the theme's settings)
+  for (const m of html.matchAll(/--[\w-]*colou?r[\w-]*\s*:\s*(#[0-9a-f]{6})\b/gi)) add(m[1], 5);
+  for (const m of html.matchAll(/--[\w-]*colou?r[\w-]*\s*:\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\b/gi)) add(toHex(m[1], m[2], m[3]), 5);
+  for (const m of html.matchAll(/#([0-9a-f]{6})\b/gi)) add(`#${m[1]}`);
+  for (const m of html.matchAll(/rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/gi)) add(toHex(m[1], m[2], m[3]));
+  const colors = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([hex]) => hex);
+  res.json({ url, store: st.name, colors });
 }));
 
 // sound settings: effects on/off; music built-in, off, or a custom https file
@@ -107,16 +161,20 @@ function gameFields(b) {
     type: b.type, name: String(b.name || GAME_TYPES[b.type].label).slice(0, 80),
     status: b.status === 'paused' ? 'paused' : 'active', theme, brand,
     per: singleReward(b.type) ? 1 : Math.min(5, Math.max(1, parseInt(b.rewards_per_play, 10) || 1)),
-    texts: { heading: loc(tx.heading), subheading: loc(tx.subheading), privacy: loc(tx.privacy), triggerLabel: loc(tx.triggerLabel), privacyUrl: String(tx.privacyUrl || '').slice(0, 300), intro: cleanIntro(tx.intro), sound: cleanSound(tx.sound), reminder: { enabled: tx.reminder?.enabled !== false } },
+    texts: { heading: loc(tx.heading), subheading: loc(tx.subheading), privacy: loc(tx.privacy), triggerLabel: loc(tx.triggerLabel), privacyUrl: String(tx.privacyUrl || '').slice(0, 300), intro: cleanIntro(tx.intro), sound: cleanSound(tx.sound), reminder: { enabled: tx.reminder?.enabled !== false },
+      // arcade games: preset palette, or the website's own colours
+      colors: { mode: tx.colors?.mode === 'site' && isHex(tx.colors?.main) ? 'site' : 'theme', main: isHex(tx.colors?.main) ? tx.colors.main : '', second: isHex(tx.colors?.second) ? tx.colors.second : '' } },
     from_name: String(b.from_name || '').slice(0, 120), from_email: String(b.from_email || '').trim().slice(0, 254), reply_to: String(b.reply_to || '').trim().slice(0, 254),
     subject: loc(b.email_subject),
   };
 }
 adminRouter.post('/games', wrap(async (req, res) => {
   const f = gameFields(req.body);
-  const { rows } = await q(`INSERT INTO games (store_id,type,name,status,theme,brand_accent,rewards_per_play,texts,from_name,from_email,reply_to,email_subject)
+  const { rows: [grp] } = await q('SELECT id FROM store_groups WHERE id = $1', [/^[0-9a-f-]{36}$/i.test(req.body.group_id || '') ? req.body.group_id : null]);
+  if (!grp) return res.status(400).json({ error: 'Pick the store group this game is for.' });
+  const { rows } = await q(`INSERT INTO games (group_id,type,name,status,theme,brand_accent,rewards_per_play,texts,from_name,from_email,reply_to,email_subject)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-    [req.body.store_id, f.type, f.name, f.status, f.theme, f.brand, f.per, f.texts, f.from_name, f.from_email, f.reply_to, f.subject]);
+    [grp.id, f.type, f.name, f.status, f.theme, f.brand, f.per, f.texts, f.from_name, f.from_email, f.reply_to, f.subject]);
   res.status(201).json(rows[0]);
 }));
 adminRouter.put('/games/:id', wrap(async (req, res) => {
@@ -175,7 +233,7 @@ const libFields = (b) => {
 adminRouter.get('/library', wrap(async (_req, res) => {
   const { rows } = await q(`SELECT l.*, count(r.id)::int AS used_in,
       coalesce(json_agg(json_build_object('game_id', g.id, 'game', g.name, 'store', s.name)) FILTER (WHERE r.id IS NOT NULL), '[]') AS games
-    FROM reward_library l LEFT JOIN rewards r ON r.library_id = l.id LEFT JOIN games g ON g.id = r.game_id LEFT JOIN stores s ON s.id = g.store_id
+    FROM reward_library l LEFT JOIN rewards r ON r.library_id = l.id LEFT JOIN games g ON g.id = r.game_id LEFT JOIN store_groups s ON s.id = g.group_id
     GROUP BY l.id ORDER BY l.title->>'en'`);
   res.json(rows);
 }));
@@ -209,6 +267,23 @@ adminRouter.delete('/library/:id', wrap(async (req, res) => {
     res.json({ games_updated: used.length });
   } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
 }));
+// Games used to belong to one store; now they belong to a store group. At startup, any game without a group moves
+// to its store's group; a store without a group first gets its own (named after it), so no website loses a game.
+export async function moveGamesToGroups() {
+  const client = await pool.connect(); let moved = 0, created = 0;
+  try {
+    await client.query('BEGIN');
+    const { rows: lone } = await client.query(`SELECT DISTINCT s.id, s.name FROM games g JOIN stores s ON s.id = g.store_id WHERE g.group_id IS NULL AND s.group_id IS NULL`);
+    for (const st of lone) {
+      const { rows: [grp] } = await client.query('INSERT INTO store_groups (name) VALUES ($1) RETURNING id', [st.name]);
+      await client.query('UPDATE stores SET group_id = $2 WHERE id = $1', [st.id, grp.id]); created++;
+    }
+    ({ rowCount: moved } = await client.query(`UPDATE games g SET group_id = s.group_id FROM stores s WHERE g.group_id IS NULL AND s.id = g.store_id AND s.group_id IS NOT NULL`));
+    await client.query('COMMIT');
+  } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+  return { moved, created };
+}
+
 // Games take rewards only from the library. Any reward typed straight into a game (from before the library existed)
 // becomes a library entry (same code + English title = one entry) and is linked to it. Runs at startup.
 export async function linkCustomRewards() {
@@ -261,7 +336,7 @@ adminRouter.get('/games/:id/export.csv', wrap(async (req, res) => {
   const all = req.params.id === 'all';
   const { rows } = await q(`
     SELECT p.email, p.locale, p.created_at, g.name AS game, s.name AS store, sg.name AS store_group, pr.title, pr.code
-    FROM plays p JOIN play_rewards pr ON pr.play_id = p.id JOIN games g ON g.id = p.game_id JOIN stores s ON s.id = g.store_id
+    FROM plays p JOIN play_rewards pr ON pr.play_id = p.id JOIN games g ON g.id = p.game_id JOIN stores s ON s.id = p.store_id
     LEFT JOIN store_groups sg ON sg.id = s.group_id
     WHERE NOT p.is_test AND ($1::boolean OR p.game_id = $2::uuid) AND ($3::uuid IS NULL OR pr.reward_id = $3)
     ORDER BY p.created_at DESC`, [all, all ? null : req.params.id, req.query.reward_id || null]);
