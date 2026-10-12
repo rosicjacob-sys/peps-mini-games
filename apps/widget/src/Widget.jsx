@@ -95,14 +95,16 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
   // The store's live games (paused ones are never listed). Loaded with the page and again every time the game
   // window opens, so a game paused in the dashboard disappears even from a page that was already open.
   const loadGames = (refresh) => fetch(`${api}/api/public/config?key=${encodeURIComponent(store)}`, { cache: 'no-store' })
-    .then((r) => (r.ok ? r.json() : Promise.reject()))
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status === 404 ? `no store is set up for ${location.origin} (add it to the store's websites)` : `HTTP ${r.status}`))))
     .then((d) => {
       // each game carries this store's website colours (used by arcade games set to match the site)
       const list = d.games.filter((g) => GAMES[g.type] && (!gameType || g.type === gameType)).map((g) => ({ ...g, site: d.site }));
+      // a hint in the browser console when nothing shows (shop owners and support look there first)
+      if (!refresh && !list.length) console.info('[peps-games] no live games with rewards for this store');
       setGames(list);
       setGame((cur) => (list.length === 1 ? list[0] : cur && list.find((g) => g.id === cur.id)) || null);
     })
-    .catch(() => { if (!refresh) setGames([]); });
+    .catch((e) => { if (!refresh) { console.warn(`[peps-games] games not loaded from ${api}: ${e.message}`); setGames([]); } });
   useEffect(() => { loadGames(false); }, [store, api, gameType]);
 
   const current = game || games?.[0];

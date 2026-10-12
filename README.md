@@ -20,7 +20,10 @@ render.yaml      Render Blueprint
   brand colours, read automatically from the store's homepage (on save, at startup, and on first widget load; editable
   or re-detected per store on the Stores page). Stores without colours use the game's palette.
 - **Check install** (Stores): loads the store's site like a visitor and reports what stops the games from showing
-  (no install line, address not listed incl. www., wrong key, outdated widget build, password page, no live games).
+  (no install line, address not listed incl. www., wrong key, outdated widget build, password page, no live games,
+  live games without rewards, a Content-Security-Policy that blocks the widget). It then asks the games server for the
+  store's games exactly as the widget would (same API address, the site's Origin) and lists what visitors get.
+  A live game with no active rewards is never shown on a site; the Games and Stores pages flag it.
 - **One install line for every store**: `<script src=".../widget.js" data-locale="{{ request.locale.iso_code }}" defer>`.
   The API finds the store from the page's website (the store's listed websites; each can belong to one store).
   `data-store="<key>"` still works and is needed only for a store with no website listed.

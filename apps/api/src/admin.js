@@ -63,7 +63,7 @@ adminRouter.delete('/groups/:id', wrap(async (req, res) => {
 adminRouter.get('/stores', wrap(async (_req, res) => {
   // a store shows its group's games
   const { rows } = await q(`SELECT s.*, sg.name AS group_name,
-      coalesce((SELECT json_agg(json_build_object('id', g.id, 'name', g.name, 'type', g.type, 'status', g.status) ORDER BY g.created_at) FROM games g WHERE g.group_id = s.group_id), '[]') AS games
+      coalesce((SELECT json_agg(json_build_object('id', g.id, 'name', g.name, 'type', g.type, 'status', g.status, 'rewards', (SELECT count(*) FROM rewards r WHERE r.game_id = g.id AND r.active)) ORDER BY g.created_at) FROM games g WHERE g.group_id = s.group_id), '[]') AS games
     FROM stores s LEFT JOIN store_groups sg ON sg.id = s.group_id ORDER BY sg.sort, sg.name NULLS LAST, s.created_at`);
   for (const s of rows) s.game_count = s.games.length;
   res.json(rows);
@@ -102,6 +102,26 @@ adminRouter.put('/stores/:id', wrap(async (req, res) => {
 }));
 // "Check install": load the store's website like a visitor and report what stops the games from showing
 const WIDGET_MARK = 'pg-groups-v1';   // set by widget builds that support the shared (keyless) install line
+// the API's own public address (for fixes that name it)
+const apiBase = () => (process.env.PUBLIC_API_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/$/, '');
+// Which of these [directive, url] pairs a Content-Security-Policy header would block (directive falls back to default-src).
+function cspBlocks(header, pairs) {
+  if (!header) return [];
+  const dirs = Object.fromEntries(header.split(';').map((d) => d.trim().split(/\s+/)).filter((d) => d[0]).map(([k, ...v]) => [k.toLowerCase(), v]));
+  return pairs.filter(([name, url]) => {
+    const list = dirs[name] || dirs['default-src'];
+    if (!list) return false;
+    const u = new URL(url);
+    return !list.some((src) => {
+      const v = src.replace(/^'|'$/g, '');
+      if (v === '*' || v === 'https:' || src === u.protocol) return true;
+      const m = v.match(/^(?:(https?):\/\/)?(\*\.)?([^/:]+)/i);
+      if (!m || (m[1] && `${m[1]}:` !== u.protocol)) return false;
+      return m[2] ? u.hostname.endsWith(`.${m[3]}`) : u.hostname === m[3];
+    });
+  }).map(([name, url]) => `${new URL(url).origin} (${name})`);
+}
+
 adminRouter.get('/stores/:id/check', wrap(async (req, res) => {
   const { rows: [s] } = await q(`SELECT s.*, (SELECT count(*)::int FROM games g WHERE g.group_id = s.group_id AND g.status = 'active') AS live
     FROM stores s WHERE s.id = $1`, [req.params.id]);
@@ -110,12 +130,16 @@ adminRouter.get('/stores/:id/check', wrap(async (req, res) => {
   const done = (extra = {}) => res.json({ ok: checks.every((c) => c.ok), checks, ...extra });
   add(s.group_id, 'The store is in a store group', 'Edit the store and pick its group: a store shows its group\'s games.');
   add(s.live > 0, `Its group has live games (${s.live})`, 'Add games to the group on the Games page, or switch them to Live.');
+  // a live game with no active rewards cannot be played, so the site never lists it
+  const { rows: bare } = await q(`SELECT g.name FROM games g WHERE g.group_id = $1 AND g.status = 'active'
+    AND NOT EXISTS (SELECT 1 FROM rewards r WHERE r.game_id = g.id AND r.active) ORDER BY g.created_at`, [s.group_id]);
+  if (s.live > 0) add(!bare.length, 'Every live game has rewards', `${bare.map((g) => g.name).join(', ')} ${bare.length > 1 ? 'have' : 'has'} no active rewards, so the site hides ${bare.length > 1 ? 'them' : 'it'}. Open the game, add rewards from the library on its Rewards tab, and Save.`);
   const url = s.site_url || s.allowed_origins[0];
   if (!add(url, 'A website is listed for the store', 'Edit the store and add its website address.')) return done();
-  let html = '', finalUrl = url;
+  let html = '', finalUrl = url, csp = '';
   try {
     const r = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'Mozilla/5.0 (peps-games install check)' } });
-    html = (await r.text()).slice(0, 3_000_000); finalUrl = r.url || url;
+    html = (await r.text()).slice(0, 3_000_000); finalUrl = r.url || url; csp = r.headers.get('content-security-policy') || '';
   } catch (e) { add(false, `The website opens (${url})`, `It could not be opened: ${e.name === 'TimeoutError' ? 'timed out' : e.message}.`); return done(); }
   const origin = new URL(finalUrl).origin;
   const locked = /\/password(\b|$)/.test(new URL(finalUrl).pathname);
@@ -127,11 +151,36 @@ adminRouter.get('/stores/:id/check', wrap(async (req, res) => {
   const t = tags[0];
   if (t.key) add(t.key === s.public_key, 'The line\'s data-store key is this store\'s', 'The pasted line carries another store\'s key. Use the shared line (no key) from the Stores page.');
   else add(s.allowed_origins.includes(origin), `The site's address (${origin}) is in the store's websites`, `Visitors land on ${origin}. Add exactly that address to the store's websites (Edit), including www. if it is used.`);
+  let js = '';
   try {
-    const js = await (await fetch(t.src, { signal: AbortSignal.timeout(10000) })).text();
+    const r = await fetch(t.src, { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    js = await r.text();
     add(t.key || js.includes(WIDGET_MARK), 'The widget is the latest version', 'The widget service is an older build that needs the data-store key. Redeploy peps-games-widget on Render (Manual Deploy → Deploy latest commit), then wait a few minutes for the cache.');
-  } catch (e) { add(false, `The widget file loads (${t.src})`, `It could not be loaded: ${e.message}. Check the address in the install line.`); }
-  done({ url: finalUrl, script: t.tag });
+  } catch (e) { add(false, `The widget file loads (${t.src})`, `It could not be loaded: ${e.message}. Check the address in the install line.`); return done({ url: finalUrl, script: t.tag }); }
+  // Now what a visitor's browser does next: ask the games server for this store's games, from the site's address.
+  // The server address is the line's data-api, else the one built into widget.js, else the widget's address with -api.
+  const api = (t.tag.match(/data-api=["']([^"']+)["']/i)?.[1] || js.match(/dataset\.api\|\|"(https?:[^"]+)"/)?.[1] || new URL(t.src).origin.replace('-widget', '-api')).replace(/\/$/, '');
+  const blocked = cspBlocks(csp, [['script-src', t.src], ['connect-src', api]]);
+  add(!blocked.length, 'The site\'s security policy lets the widget run', `The site sends a Content-Security-Policy that blocks ${blocked.join(' and ')}. Allow those addresses in the app or setting that adds the policy.`);
+  let cfg = null;
+  try {
+    const r = await fetch(`${api}/api/public/config?key=${encodeURIComponent(t.key)}`, { signal: AbortSignal.timeout(20000), headers: { Origin: origin } });
+    const allow = r.headers.get('access-control-allow-origin');
+    const body = await r.json().catch(() => null);
+    if (!body) throw new Error(`HTTP ${r.status}, not the games server`);
+    if (r.status === 404) add(false, 'The games server recognises the site', `${api} has no store for ${origin}, so the widget there talks to a different games server than this dashboard. Set VITE_API_URL on peps-games-widget to ${apiBase() || 'this API\'s address'} and redeploy it.`);
+    else if (!r.ok) add(false, `The games server answers (${api})`, `It returned HTTP ${r.status}.`);
+    else if (allow !== '*' && allow !== origin) add(false, 'The games server allows the site', `${api} does not allow requests from ${origin} (CORS).`);
+    else cfg = body;
+  } catch (e) {
+    add(false, `The widget reaches the games server (${api})`, `It could not be reached: ${e.name === 'TimeoutError' ? 'timed out' : e.message}. On Render, set VITE_API_URL on peps-games-widget to this API's address (${apiBase() || 'https://<your api>.onrender.com'}), then Manual Deploy → Deploy latest commit.`);
+  }
+  if (cfg) {
+    const names = (cfg.games || []).map((g) => g.name);
+    add(names.length, `Visitors get ${names.length} game${names.length === 1 ? '' : 's'}${names.length ? `: ${names.join(', ')}` : ''}`, 'The games server returned no playable games for this site. Each live game needs at least one active reward.');
+  }
+  done({ url: finalUrl, script: t.tag, api });
 }));
 
 // read the store's colours from its website again (also replaces a manual choice)
@@ -147,7 +196,8 @@ adminRouter.get('/games', wrap(async (req, res) => {
   const { rows } = await q(`
     SELECT g.*, sg.name AS group_name,
       (SELECT count(*)::int FROM stores s WHERE s.group_id = g.group_id) AS store_count,
-      (SELECT count(*)::int FROM plays p WHERE p.game_id = g.id AND NOT p.is_test) AS play_count
+      (SELECT count(*)::int FROM plays p WHERE p.game_id = g.id AND NOT p.is_test) AS play_count,
+      (SELECT count(*)::int FROM rewards r WHERE r.game_id = g.id AND r.active) AS reward_count
     FROM games g LEFT JOIN store_groups sg ON sg.id = g.group_id
     WHERE ($1::uuid IS NULL OR g.group_id = $1) AND ($2::uuid IS NULL OR g.group_id = (SELECT group_id FROM stores WHERE id = $2))
     ORDER BY sg.sort, sg.name NULLS LAST, g.created_at`, [req.query.group_id || null, req.query.store_id || null]);
