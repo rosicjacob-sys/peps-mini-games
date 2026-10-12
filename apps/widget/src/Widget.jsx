@@ -47,10 +47,13 @@ function initialLocale(raw) {
 // The intro only shows on the homepage (/, or a language/market root like /fr, /en-ca).
 const isHome = () => /^\/(?:[a-z]{2}(?:-[a-z]{2})?)?\/?$/i.test(location.pathname);
 
-// this browser played one of the store's games this week (one play per email per week, across all games)
+// this browser played one of the group's games this week (one play per email per week, across all of its stores)
 const PLAYED = (storeKey) => `pg_played_${storeKey}`;
-const playedThisWeek = (storeKey) => { const v = store_(() => localStorage.getItem(PLAYED(storeKey))); return !!v && Date.now() < new Date(v).getTime(); };
+const playedUntil = (storeKey) => { const v = store_(() => localStorage.getItem(PLAYED(storeKey))); return v && Date.now() < new Date(v).getTime() ? v : null; };
 const markPlayed = (storeKey, until) => store_(() => until && localStorage.setItem(PLAYED(storeKey), until));
+
+// the visitor-facing name of a game: its heading, else its type ("Prize Wheel"); never the admin's internal name
+const gameTitle = (g, locale) => t(g.texts?.heading, locale) || GAME_TYPES[g.type]?.label || g.name;
 
 function gateBlocking(sel) {
   let els = [];
@@ -75,6 +78,30 @@ function whenAgeGateClear(sel, cb) {
   return () => clearInterval(id);
 }
 
+// Dialog behaviour for a modal: Escape closes it, Tab stays inside it, and the element that had focus (the
+// floating button) gets it back when it closes. Works inside the shadow root.
+const FOCUSABLE = 'button:not([disabled]),[href],input:not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])';
+function useDialog(ref, onClose) {
+  useEffect(() => {
+    const el = ref.current; if (!el) return undefined;
+    const root = el.getRootNode();
+    const before = root.activeElement || document.activeElement;
+    const first = el.querySelector('[autofocus]') || el.querySelector(FOCUSABLE);
+    (first || el).focus({ preventScroll: true });
+    const key = (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
+      if (e.key !== 'Tab') return;
+      const items = [...el.querySelectorAll(FOCUSABLE)].filter((x) => x.offsetParent !== null);
+      if (!items.length) { e.preventDefault(); return; }
+      const cur = root.activeElement; const i = items.indexOf(cur);
+      if (e.shiftKey && (i <= 0)) { e.preventDefault(); items[items.length - 1].focus(); }
+      else if (!e.shiftKey && (i === -1 || i === items.length - 1)) { e.preventDefault(); items[0].focus(); }
+    };
+    el.addEventListener('keydown', key);
+    return () => { el.removeEventListener('keydown', key); if (before && before.isConnected && typeof before.focus === 'function') before.focus({ preventScroll: true }); };
+  }, []);
+}
+
 function LangToggle({ locale, setLocale }) {
   return (
     <div className="lang" role="group" aria-label="Language">
@@ -83,29 +110,32 @@ function LangToggle({ locale, setLocale }) {
   );
 }
 
-export default function Widget({ store, api, locale: rawLocale, gameType, ageSelector, introPages }) {
+export default function Widget({ store, api, locale: rawLocale, gameType, ageSelector, introPages, preview }) {
   const [locale, setLocaleState] = useState(() => initialLocale(rawLocale));
   const setLocale = (l) => { setLocaleState(l); store_(() => localStorage.setItem('pg_locale', l)); };
   const ui = UI[locale];
   const [games, setGames] = useState(null);
+  const [introCfg, setIntroCfg] = useState({});
   const [open, setOpen] = useState(false);
   const [intro, setIntro] = useState(false);
   const [game, setGame] = useState(null);
+  const [played, setPlayed] = useState(() => (preview ? null : playedUntil(store)));
 
-  // The store's live games (paused ones are never listed). Loaded with the page and again every time the game
-  // window opens, so a game paused in the dashboard disappears even from a page that was already open.
-  const loadGames = (refresh) => fetch(`${api}/api/public/config?key=${encodeURIComponent(store)}`, { cache: 'no-store' })
+  // The store's live games (paused ones are never listed) and its group's popup. Loaded with the page and again
+  // every time the game window opens, so a game paused in the dashboard disappears even from a page that was open.
+  const query = preview ? `preview=${encodeURIComponent(preview)}` : `key=${encodeURIComponent(store)}`;
+  const loadGames = (refresh) => fetch(`${api}/api/public/config?${query}`, { cache: 'no-store' })
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status === 404 ? `no store is set up for ${location.origin} (add it to the store's websites)` : `HTTP ${r.status}`))))
     .then((d) => {
       // each game carries this store's website colours (used by arcade games set to match the site)
       const list = d.games.filter((g) => GAMES[g.type] && (!gameType || g.type === gameType)).map((g) => ({ ...g, site: d.site }));
       // a hint in the browser console when nothing shows (shop owners and support look there first)
       if (!refresh && !list.length) console.info('[peps-games] no live games with rewards for this store');
-      setGames(list);
+      setGames(list); setIntroCfg(d.intro || {});
       setGame((cur) => (list.length === 1 ? list[0] : cur && list.find((g) => g.id === cur.id)) || null);
     })
     .catch((e) => { if (!refresh) { console.warn(`[peps-games] games not loaded from ${api}: ${e.message}`); setGames([]); } });
-  useEffect(() => { loadGames(false); }, [store, api, gameType]);
+  useEffect(() => { loadGames(false); }, [store, api, gameType, preview]);
 
   const current = game || games?.[0];
   // sounds follow the game on screen; music plays only while the game window is open
@@ -114,6 +144,7 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
   const openGame = () => { sound.unlock(); setOpen(true); loadGames(true); };
   // closing forgets the chosen game when the store has several, so "Play & Win" opens the picker again
   const close = () => { setOpen(false); if (games?.length > 1) setGame(null); };
+  const onPlayed = (until) => { if (preview) return; markPlayed(store, until); setPlayed(until); };
 
   // Arriving from a reminder email (?pg_play=1): open the game straight away, after age verification.
   const fromReminder = useMemo(() => store_(() => new URLSearchParams(location.search).has('pg_play')), []);
@@ -123,56 +154,75 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
     return whenAgeGateClear(ageSelector || DEFAULT_GATE, () => setOpen(true));
   }, [current?.id]);
 
-  // Intro popup: homepage only, every visit (once per browser session), straight after age verification.
+  // Intro popup (the store group's): homepage only, every visit (once per browser session), straight after age
+  // verification. A preview from the dashboard always shows it.
   useEffect(() => {
     if (!current || fromReminder) return;
-    if (current.texts?.intro?.enabled === false) return;
-    if (introPages !== 'all' && !isHome()) return;
-    if (store_(() => sessionStorage.getItem('pg_intro_done')) || playedThisWeek(store)) return;
+    if (introCfg.enabled === false) return;
+    if (!preview) {
+      if (introPages !== 'all' && !isHome()) return;
+      if (store_(() => sessionStorage.getItem('pg_intro_done')) || played) return;
+    }
     return whenAgeGateClear(ageSelector || DEFAULT_GATE, () => setIntro(true));
   }, [current?.id]);
 
   const finishIntro = (play) => {
-    store_(() => sessionStorage.setItem('pg_intro_done', '1'));
+    if (!preview) store_(() => sessionStorage.setItem('pg_intro_done', '1'));
     setIntro(false);
     if (play) openGame();
   };
 
   if (!games?.length) return null;
-  const label = t(current.texts?.triggerLabel, locale) || ui.play;
+  // after a play the button says when to come back (always the next Monday); a different email can still play
+  const label = played ? ui.comeBackMonday : t(current.texts?.triggerLabel, locale) || ui.play;
   const arcade = categoryOf(current.type) === 'arcade';
   // the picker lists games by family when the store has both
   const families = Object.keys(CATEGORIES).map((c) => [c, games.filter((g) => categoryOf(g.type) === c)]).filter(([, l]) => l.length);
 
   return (
     <div style={cssVars(current)} className={arcade ? 'pg-arcade' : 'pg-casino'}>
-      <button className="trigger" onClick={openGame}><span className="trigger-suit" aria-hidden="true">{arcade ? '🎁' : '♠'}</span>{label}</button>
-      {intro && !open && <Intro game={current} arcade={arcade} locale={locale} setLocale={setLocale} onPlay={() => finishIntro(true)} onDecline={() => finishIntro(false)} />}
+      <button className={`trigger ${played ? 'played' : ''}`} onClick={openGame}><span className="trigger-suit" aria-hidden="true">{played ? '✓' : arcade ? '🎁' : '♠'}</span>{label}</button>
+      {intro && !open && <Intro cfg={introCfg} arcade={arcade} locale={locale} setLocale={setLocale} onPlay={() => finishIntro(true)} onDecline={() => finishIntro(false)} />}
       {open && (
-        <div className="overlay" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && close()}>
-          <div className="modal">
-            <LangToggle locale={locale} setLocale={setLocale} />
-            <SoundToggle locale={locale} />
-            <button className="close" aria-label={ui.close} onClick={close}>×</button>
-            {game ? <Play key={game.id} game={game} arcade={arcade} api={api} store={store} locale={locale} onClose={close} onBack={games.length > 1 ? () => setGame(null) : null} onUnavailable={() => loadGames(true)} /> : (
-              <div className="picker">
-                <Head arcade={arcade} title={ui.choose} />
-                {families.map(([c, list]) => (
-                  <React.Fragment key={c}>
-                    {families.length > 1 && <p className="pick-cat"><span aria-hidden="true">{CATEGORIES[c].icon}</span> {t(CATEGORIES[c].label, locale)}</p>}
-                    {list.map((g) => (
+        <Modal onClose={close} preview={preview} locale={locale}>
+          <LangToggle locale={locale} setLocale={setLocale} />
+          <SoundToggle locale={locale} />
+          <button className="close" aria-label={ui.close} onClick={close}>×</button>
+          {game ? <Play key={game.id} game={game} arcade={arcade} api={api} store={store} preview={preview} locale={locale} onClose={close} onPlayed={onPlayed} onBack={games.length > 1 ? () => setGame(null) : null} onUnavailable={() => loadGames(true)} /> : (
+            <div className="picker">
+              <Head arcade={arcade} title={ui.choose} />
+              {families.map(([c, list]) => (
+                <React.Fragment key={c}>
+                  {families.length > 1 && <p className="pick-cat"><span aria-hidden="true">{CATEGORIES[c].icon}</span> {t(CATEGORIES[c].label, locale)}</p>}
+                  {list.map((g) => {
+                    const title = gameTitle(g, locale); const kind = GAME_TYPES[g.type]?.label;
+                    return (
                       <button key={g.id} className={`pick pick-${c}`} onClick={() => { sound.play(categoryOf(g.type) === 'arcade' ? 'boing' : 'chip'); setGame(g); }}>
                         <span className="pick-ico" aria-hidden="true">{GAME_TYPES[g.type]?.icon}</span>
-                        <span className="pick-txt">{t(g.texts?.heading, locale) || g.name}<small>{GAME_TYPES[g.type]?.label}</small></span>
+                        <span className="pick-txt">{title}{kind && kind !== title && <small>{kind}</small>}</span>
                       </button>
-                    ))}
-                  </React.Fragment>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+                    );
+                  })}
+                </React.Fragment>
+              ))}
+            </div>
+          )}
+        </Modal>
       )}
+    </div>
+  );
+}
+
+// The game window: a modal dialog (Escape closes, focus stays inside). In a dashboard preview it says so.
+function Modal({ children, onClose, preview, locale, className = '' }) {
+  const ref = useRef(null);
+  useDialog(ref, onClose);
+  return (
+    <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div ref={ref} className={`modal ${className}`} role="dialog" aria-modal="true" tabIndex={-1}>
+        {preview && <div className="preview-tag">{UI[locale].preview}</div>}
+        {children}
+      </div>
     </div>
   );
 }
@@ -212,16 +262,17 @@ function Head({ arcade, title, suits, bulbs = true, className = '', id }) {
 // A row of twinkling marquee bulbs.
 const Bulbs = () => <div className="bulbs" aria-hidden="true">{Array.from({ length: 11 }, (_, i) => <i key={i} style={{ animationDelay: `${(i % 3) * 0.33}s` }} />)}</div>;
 
-// "Play to Win" popup. Copy comes from the dashboard; blank fields fall back to the defaults.
-function Intro({ game, arcade, locale, setLocale, onPlay, onDecline }) {
-  const cfg = game.texts?.intro || {};
+// "Play to Win" popup. Copy comes from the store group in the dashboard; blank fields fall back to the defaults.
+function Intro({ cfg, arcade, locale, setLocale, onPlay, onDecline }) {
   const d = INTRO_DEFAULTS[locale];
   const pick = (k) => t(cfg[k], locale) || d[k];
   const steps = (cfg.steps || []).map((x) => t(x, locale)).filter(Boolean);
   const list = steps.length ? steps : d.steps;
+  const ref = useRef(null);
+  useDialog(ref, onDecline);
   return (
-    <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="pg-intro-title" onClick={(e) => e.target === e.currentTarget && onDecline()}>
-      <div className="modal intro">
+    <div className="overlay" onClick={(e) => e.target === e.currentTarget && onDecline()}>
+      <div ref={ref} className="modal intro" role="dialog" aria-modal="true" aria-labelledby="pg-intro-title" tabIndex={-1}>
         <LangToggle locale={locale} setLocale={setLocale} />
         <button className="close" aria-label={UI[locale].close} onClick={onDecline}>×</button>
         {cfg.image && <img className="intro-img" src={cfg.image} alt="" />}
@@ -236,7 +287,7 @@ function Intro({ game, arcade, locale, setLocale, onPlay, onDecline }) {
   );
 }
 
-function Play({ game, arcade, api, store, locale, onClose, onBack, onUnavailable }) {
+function Play({ game, arcade, api, store, preview, locale, onClose, onPlayed, onBack, onUnavailable }) {
   const ui = UI[locale];
   const stages = GAMES[game.type];
   const [stage, setStage] = useState(0);
@@ -245,7 +296,7 @@ function Play({ game, arcade, api, store, locale, onClose, onBack, onUnavailable
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);   // server response - the outcome is already decided
   const [done, setDone] = useState(false);       // game animation finished
-  const heading = t(game.texts?.heading, locale) || game.name;
+  const heading = gameTitle(game, locale);
   const sub = t(game.texts?.subheading, locale);
   const privacy = t(game.texts?.privacy, locale);
   // every new screen (email, game, result) starts at the top of the window
@@ -261,12 +312,12 @@ function Play({ game, arcade, api, store, locale, onClose, onBack, onUnavailable
     try {
       const res = await fetch(`${api}/api/public/play`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: store, gameId: game.id, email: email.trim(), locale }),
+        body: JSON.stringify({ key: store, gameId: game.id, email: email.trim(), locale, ...(preview ? { preview } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok) { setResult(data); if (!data.test) markPlayed(store, data.nextPlayAt || data.expiresAt); }
+      if (res.ok) { setResult(data); if (!data.test && !data.preview) onPlayed(data.nextPlayAt || data.expiresAt); }
       else if (data.error === 'already_played') {
-        markPlayed(store, data.nextPlayAt);
+        onPlayed(data.nextPlayAt);
         const when = data.nextPlayText || new Date(data.nextPlayAt).toLocaleDateString(locale === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
         setError(`${ui.already} ${data.email || email.trim()}. ${ui.onePer} ${ui.comeBack} ${when}${ui.orOther}.`);
       }
@@ -310,7 +361,7 @@ function Play({ game, arcade, api, store, locale, onClose, onBack, onUnavailable
       <Head arcade={arcade} title={ui.lose.title} />
       <div className="lose-card">
         <p className="lose-when">{ui.lose.retry} <b>{result.nextPlayText}</b>.</p>
-        <p>✉️ {ui.lose.promo}</p>
+        {game.reminders !== false && <p>✉️ {ui.lose.promo}</p>}
       </div>
       <button className="btn ghost" onClick={onClose}>{ui.close}</button>
     </div>

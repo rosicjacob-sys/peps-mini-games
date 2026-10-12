@@ -59,3 +59,22 @@ const TEST_EMAILS = new Set(
     .map((e) => normalizeEmail(e)?.norm).filter(Boolean),
 );
 export const isTestEmail = (norm) => TEST_EMAILS.has(norm);
+
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const isUuid = (v) => UUID.test(String(v || ''));
+
+// A website typed by an admin -> its origin ("https://www.shop.com"), or null. "shop.com" gets https://.
+export function siteOrigin(v) {
+  const s = String(v || '').trim();
+  if (!s) return null;
+  // "shop.com" gets https://; any other scheme (ftp:, javascript:) is refused
+  try { const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(s) ? s : `https://${s}`); return /^https?:$/.test(u.protocol) ? u.origin.toLowerCase() : null; } catch { return null; }
+}
+// Visitors land on either "shop.com" or "www.shop.com", so a store answers to both spellings of each website.
+export function originVariants(origin) {
+  const u = new URL(origin);
+  const twin = u.hostname.startsWith('www.') ? u.hostname.slice(4) : `www.${u.hostname}`;
+  // no twin for bare hosts (localhost) or IPs
+  if (!u.hostname.includes('.') || /^\d+\.\d+\.\d+\.\d+$/.test(u.hostname)) return [origin];
+  return [origin, `${u.protocol}//${twin}${u.port ? `:${u.port}` : ''}`];
+}

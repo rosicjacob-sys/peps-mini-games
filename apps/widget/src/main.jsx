@@ -19,7 +19,8 @@ function loadFont(assetBase) {
 }
 
 // `store` (data-store) is optional: without it the API finds the store by this website's address.
-export function mount({ store = '', api, locale, game, ageSelector, introPages, assetBase }) {
+// `preview` (data-preview) is a token from the dashboard: that one game is shown and nothing is recorded.
+export function mount({ store = '', api, locale, game, ageSelector, introPages, assetBase, preview }) {
   loadFont(assetBase);
   const host = document.createElement('div');
   // the version marker the dashboard's "Check install" looks for (this build supports the shared, keyless line)
@@ -30,7 +31,7 @@ export function mount({ store = '', api, locale, game, ageSelector, introPages, 
   style.textContent = css;
   const container = document.createElement('div');
   shadow.append(style, container);
-  createRoot(container).render(<Widget store={store} api={api} locale={locale} gameType={game} ageSelector={ageSelector} introPages={introPages} />);
+  createRoot(container).render(<Widget store={store} api={api} locale={locale} gameType={game} ageSelector={ageSelector} introPages={introPages} preview={preview} />);
 }
 
 // Auto-mount from the <script> tag. The same line works on every store (no data-store needed).
@@ -38,6 +39,6 @@ const script = document.currentScript;
 if (script?.src) {
   const api = script.dataset.api || import.meta.env.VITE_API_URL || new URL(script.src).origin.replace('-widget', '-api');
   const assetBase = new URL(script.src).href.replace(/\/[^/]*$/, '');
-  const go = () => mount({ store: script.dataset.store, api, locale: script.dataset.locale || document.documentElement.lang, game: script.dataset.game, ageSelector: script.dataset.ageSelector, introPages: script.dataset.introPages, assetBase });
+  const go = () => mount({ store: script.dataset.store, api, locale: script.dataset.locale || document.documentElement.lang, game: script.dataset.game, ageSelector: script.dataset.ageSelector, introPages: script.dataset.introPages, assetBase, preview: script.dataset.preview });
   document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', go) : go();
 }

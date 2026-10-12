@@ -1,4 +1,6 @@
 // Number/date formatting shared by every page. Dates are ET calendar days ("YYYY-MM-DD").
+import { GAME_TYPES } from '@peps/shared';
+
 const ZONE = 'America/Toronto';
 const nf = new Intl.NumberFormat('en-CA');
 const cf = new Intl.NumberFormat('en-CA', { notation: 'compact', maximumFractionDigits: 1 });
@@ -27,4 +29,5 @@ export function change(cur, prev) {
   return { ratio: r, dir: Math.abs(r) < 0.005 ? 'flat' : r > 0 ? 'up' : 'down' };
 }
 export const tr = (v) => (v && typeof v === 'object' ? v.en || v.fr || '' : v || '');
-export const TYPE_LABEL = { wheel: 'Prize Wheel', slots: 'Slot Machine', blackjack: 'Blackjack', color: 'Color Game', lucky9: 'Lucky 9', baccarat: 'Baccarat', poker: 'Poker' };
+// the label of a game type ("Prize Wheel"), from the shared list so every type is covered
+export const typeLabel = (type) => GAME_TYPES[type]?.label || type || '';

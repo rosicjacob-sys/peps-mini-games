@@ -139,13 +139,15 @@ export default function Wheel({ game, result, locale, onDone }) {
           const ink = !arcade ? th.text : r.lose ? '#4a4458' : pops[k].fg;
           const mid = a0 + step / 2;
           const [tx, ty] = polar(mid, R * 0.57);
+          // labels run along the slice; on the left half they are turned round so they never read upside-down
+          const flip = mid > 180 ? 180 : 0;
           const { lines, f } = layoutLabel(t(r.title, locale), maxLines);
           return (
             <g key={r.id} className={r.id === wonId ? 'slice won' : 'slice'}>
               {n === 1 ? <circle cx={R} cy={R} r={R - 7} fill={fill} stroke={rim} strokeWidth="1.5" />
                 : <path d={`M${R},${R} L${x0},${y0} A${R - 7},${R - 7} 0 ${step > 180 ? 1 : 0} 1 ${x1},${y1} Z`} fill={fill} stroke={rim} strokeWidth="2.5" />}
               <text x={tx} y={ty} fill={ink} fontSize={f} fontWeight="800" letterSpacing=".06em" style={{ textTransform: 'uppercase' }} textAnchor="middle" dominantBaseline="middle"
-                transform={`rotate(${mid - 90} ${tx} ${ty})`}>
+                transform={`rotate(${mid - 90 + flip} ${tx} ${ty})`}>
                 {lines.map((l, j) => <tspan key={j} x={tx} dy={j === 0 ? `${-(lines.length - 1) * 0.55}em` : '1.1em'}>{l}</tspan>)}
               </text>
             </g>

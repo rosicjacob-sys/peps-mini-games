@@ -14,9 +14,9 @@ export default function Reminders() {
   const f = useFilters();
   const [status, setStatus] = useState(''); const [page, setPage] = useState(0);
   const [d, setD] = useState(null); const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState({}); const [note, setNote] = useState(''); const [running, setRunning] = useState(false);
+  const [busy, setBusy] = useState({}); const [note, setNote] = useState(''); const [running, setRunning] = useState(false); const [err, setErr] = useState('');
   const params = useMemo(() => ({ ...f.params, status, page }), [f.params, status, page]);
-  const load = () => { setLoading(true); return api.reminders(params).then(setD).finally(() => setLoading(false)); };
+  const load = () => { setLoading(true); return api.reminders(params).then((x) => { setD(x); setErr(''); }).catch((e) => setErr(e.message)).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, [JSON.stringify(params)]);
   useEffect(() => setPage(0), [JSON.stringify(f.params), status]);
   // while a run is sending in the background, refresh every few seconds
@@ -44,11 +44,12 @@ export default function Reminders() {
       <PageHead title="Reminder emails" sub="Every Monday after the 12:00 AM ET reset, everyone who played a store's games the week before gets one email inviting them to play again. Codes are shown on screen only; no code emails are sent."
         actions={<button className="primary" onClick={runNow}>Send due reminders now</button>} />
       <FilterBar />
+      {err && <div className="alert bad">{err}</div>}
       <div className="grid g-4">
         <div className="tile"><div className="tile-label">Sent</div><div className="tile-value">{fmtInt(c.sent)}</div></div>
         <div className="tile"><div className="tile-label">Failed</div><div className="tile-value">{fmtInt(c.failed)}</div>{c.failed > 0 && <span className="status critical"><span aria-hidden="true">✕</span> see the reason below</span>}</div>
         <div className="tile"><div className="tile-label">Unsubscribed</div><div className="tile-value">{fmtInt(c.unsubscribed)}</div><span className="muted small">in this date range</span></div>
-        <div className="tile"><div className="tile-label">Delivery rate</div><Meter value={c.sent + c.failed ? c.sent / (c.sent + c.failed) : 1} /></div>
+        <div className="tile"><div className="tile-label">Delivery rate</div>{c.sent + c.failed ? <Meter value={c.sent / (c.sent + c.failed)} /> : <div className="tile-value muted">–</div>}{!(c.sent + c.failed) && <span className="muted small">no emails sent in this range</span>}</div>
       </div>
       <div className="alert info small">Who gets one: players from the previous week, one email per store. Skipped: test emails, anyone who unsubscribed (every email has a link), and anyone who already played again that week. Failed sends are retried automatically up to 3 times. Switch reminders off per game in its <b>Texts &amp; Email</b> tab.</div>
       <div className="toolbar">
@@ -74,6 +75,7 @@ export default function Reminders() {
                 <td>{['failed', 'pending'].includes(r.status) && <button className="ghost small" disabled={busy[r.id]} onClick={() => resend(r.id)}>{busy[r.id] ? 'Sending…' : 'Send'}</button>}</td>
               </tr>
             ))}
+            {!d && !err && <tr><td colSpan="9" className="muted empty">Loading…</td></tr>}
             {d && !d.rows.length && <tr><td colSpan="9" className="muted empty">{status === 'failed' ? 'No failed reminders in this range. 🎉' : 'No reminders in this range yet. They go out after each Monday reset.'}</td></tr>}
           </tbody>
         </table></div>

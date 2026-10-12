@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api.js';
-import { todayET, addDays, dowOf, fmtRange, TYPE_LABEL } from './format.js';
+import { todayET, addDays, dowOf, fmtRange } from './format.js';
 
 // Date presets - all ET calendar days, inclusive.
 export const PRESETS = [
@@ -19,25 +19,37 @@ export const PRESETS = [
 const Ctx = createContext(null);
 const KEY = 'pg_filters';
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
+const EMPTY = { group_id: '', store_id: '', game_id: '' };
 
 export function FiltersProvider({ children }) {
   const saved = load();
-  const [preset, setPreset] = useState(saved.preset || '30d');
+  const [preset, setPreset] = useState(() => (PRESETS.some((p) => p.key === saved.preset) || saved.preset === 'custom' ? saved.preset : '30d'));
   const [custom, setCustom] = useState(saved.custom || { from: addDays(todayET(), -29), to: todayET() });
   const [dims, setDims] = useState({ group_id: saved.group_id || '', store_id: saved.store_id || '', game_id: saved.game_id || '' });
-  const [lists, setLists] = useState({ groups: [], stores: [], games: [] });
-  const reloadLists = () => Promise.all([api.groups(), api.stores(), api.games()]).then(([groups, stores, games]) => setLists({ groups, stores, games }));
+  // archived stores and games are listed too: their plays are still in the reports
+  const [lists, setLists] = useState({ groups: [], stores: [], games: [], loaded: false, error: '' });
+  const reloadLists = () => Promise.all([api.groups(), api.stores(), api.games({ archived: 1 })])
+    .then(([groups, stores, games]) => setLists({ groups, stores, games, loaded: true, error: '' }))
+    .catch((e) => setLists((l) => ({ ...l, loaded: true, error: e.message })));
   useEffect(() => { reloadLists(); }, []);
+  // a saved filter that points at something deleted since is dropped, so the reports never look empty for no reason
+  useEffect(() => {
+    if (!lists.loaded || lists.error) return;
+    const ok = (k, list) => !dims[k] || dims[k] === 'none' || list.some((x) => x.id === dims[k]);
+    if (!ok('group_id', lists.groups) || !ok('store_id', lists.stores) || !ok('game_id', lists.games)) setDims(EMPTY);
+  }, [lists]);
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify({ preset, custom, ...dims })); } catch {} }, [preset, custom, dims]);
 
   const value = useMemo(() => {
     const t = todayET();
     const [from, to] = preset === 'custom' ? [custom.from, custom.to] : PRESETS.find((p) => p.key === preset).range(t);
-    return { preset, setPreset, custom, setCustom, dims, setDims, lists, reloadLists, params: { from, to, ...dims } };
+    return { preset, setPreset, custom, setCustom, dims, setDims, lists, reloadLists, allTime: from === 'all', params: { from, to, ...dims } };
   }, [preset, custom, dims, lists]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 export const useFilters = () => useContext(Ctx);
+
+const archived = (x) => (x.archived_at ? ' (archived)' : '');
 
 // One row above everything it scopes: date range first, then group → store → game.
 export function FilterBar({ lockGame, extra }) {
@@ -92,13 +104,13 @@ export function FilterBar({ lockGame, extra }) {
           </select>
           <select className="fb-select" aria-label="Store" value={f.dims.store_id} onChange={(e) => set('store_id', e.target.value)}>
             <option value="">All stores</option>
-            {storeOpts.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {storeOpts.map((s) => <option key={s.id} value={s.id}>{s.name}{archived(s)}</option>)}
           </select>
           <select className="fb-select" aria-label="Game" value={f.dims.game_id} onChange={(e) => set('game_id', e.target.value)}>
             <option value="">All games</option>
-            {gameOpts.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.group_name}</option>)}
+            {gameOpts.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.group_name}{archived(g)}</option>)}
           </select>
-          {active && <button className="link" onClick={() => f.setDims({ group_id: '', store_id: '', game_id: '' })}>Clear filters</button>}
+          {active && <button className="link" onClick={() => f.setDims(EMPTY)}>Clear filters</button>}
         </>
       )}
       <span className="fb-range muted">{f.params.from === 'all' ? 'All time' : fmtRange(f.params.from, f.params.to)} · ET</span>
@@ -106,4 +118,3 @@ export function FilterBar({ lockGame, extra }) {
     </div>
   );
 }
-export { TYPE_LABEL };

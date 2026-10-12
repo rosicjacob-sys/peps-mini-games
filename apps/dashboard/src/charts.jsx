@@ -190,7 +190,7 @@ export function Sparkline({ values, height = 32 }) {
 }
 
 // ---- stat tile: label · value · delta vs previous period · sparkline
-export function StatTile({ label, value, delta, goodUp = true, spark, hint, prevLabel = 'vs previous period' }) {
+export function StatTile({ label, value, delta, goodUp = true, spark, hint, foot, prevLabel = 'vs previous period' }) {
   let cls = 'flat', icon = '–', txt = 'No change';
   if (delta && delta.ratio === null) { cls = goodUp ? 'good' : 'bad'; icon = '▲'; txt = 'New'; }
   else if (delta && delta.dir !== 'flat') { const good = (delta.dir === 'up') === goodUp; cls = good ? 'good' : 'bad'; icon = delta.dir === 'up' ? '▲' : '▼'; txt = pct(Math.abs(delta.ratio), Math.abs(delta.ratio) < 0.1 ? 1 : 0); }
@@ -201,6 +201,7 @@ export function StatTile({ label, value, delta, goodUp = true, spark, hint, prev
       <div className="tile-foot">
         {delta !== undefined && <span className={`delta ${cls}`}><span aria-hidden="true">{icon}</span> {txt}</span>}
         {delta !== undefined && <span className="muted small">{prevLabel}</span>}
+        {foot && <span className="muted small">{foot}</span>}
       </div>
       {spark && <Sparkline values={spark} />}
     </div>

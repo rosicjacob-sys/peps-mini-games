@@ -83,12 +83,8 @@ CREATE TABLE IF NOT EXISTS store_groups (
 );
 ALTER TABLE stores ADD COLUMN IF NOT EXISTS group_id uuid REFERENCES store_groups(id) ON DELETE SET NULL;
 
--- casino palettes replaced the neutral ones
+-- casino palettes replaced the neutral ones (the one-off sweep of old theme names is in migrations/001)
 ALTER TABLE games ALTER COLUMN theme SET DEFAULT 'emerald';
-UPDATE games SET theme = 'emerald' WHERE theme IN ('pearl', 'ivory', 'stone', 'silver', 'graphite', 'midnight');
-
--- each game type has its own default: wheels that were swept onto Emerald go to Burgundy
-UPDATE games SET theme = 'burgundy' WHERE type = 'wheel' AND theme = 'emerald';
 
 -- email delivery details (reason shown in the dashboard; resends counted)
 ALTER TABLE plays ADD COLUMN IF NOT EXISTS email_error text;
@@ -148,11 +144,13 @@ ALTER TABLE games ALTER COLUMN store_id DROP NOT NULL;   -- legacy: the store a 
 CREATE INDEX IF NOT EXISTS games_group_idx ON games(group_id);
 -- a play remembers the store it happened on (games are shared by the group's stores)
 ALTER TABLE plays ADD COLUMN IF NOT EXISTS store_id uuid REFERENCES stores(id) ON DELETE CASCADE;
-UPDATE plays p SET store_id = g.store_id FROM games g WHERE p.store_id IS NULL AND g.id = p.game_id AND g.store_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS plays_store_week_idx ON plays(store_id, email_norm, week_key);
--- one play per email per *store* per week is enforced in /play (under a lock); the old per-game rule would wrongly
--- block the same game on a second store of the group
+-- one play per email per *store group* per week is enforced in /play (under a lock); the old per-game rule would
+-- wrongly block the same game on a second store of the group
 ALTER TABLE plays DROP CONSTRAINT IF EXISTS plays_game_id_email_norm_week_key_key;
 
 -- each store's brand colours (read from its website, or set by hand), used by arcade games set to "Match my website"
 ALTER TABLE stores ADD COLUMN IF NOT EXISTS colors jsonb NOT NULL DEFAULT '{}';
+
+-- Columns added after schema.sql became the baseline live in src/migrations/ (applied once, in order):
+--   002  store_groups.intro (the popup moved from games to groups), stores.archived_at, games.archived_at

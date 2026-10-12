@@ -4,10 +4,9 @@
 import { DateTime } from 'luxon';
 import { q } from './db.js';
 import { runReminders, deliver, reminderFor } from './reminders.js';
-import { normalizeEmail } from './lib.js';
+import { normalizeEmail, UUID } from './lib.js';
 
 const ZONE = 'America/Toronto';
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 // a play's store is where it happened (a game is shared by its group's stores)
@@ -105,23 +104,25 @@ export function registerReports(router, wrap, csvCell) {
         SELECT p.email_norm, min(p.created_at) AS first_at ${BASE} ${where(nScope)} GROUP BY p.email_norm) f WHERE ${nRange} GROUP BY 1`, nParams);
 
     const s2 = P();
+    // per game: a game is shared by its group's stores, so its rewards are counted across them (the store filter
+    // narrows everything to one store)
     const rewards = q(`SELECT pr.reward_id, (array_agg(pr.title ORDER BY p.created_at DESC))[1] AS title, (array_agg(pr.code ORDER BY p.created_at DESC))[1] AS code,
-        g.id AS game_id, g.name AS game, g.type, s.name AS store, count(*)::int AS won, count(DISTINCT p.email_norm)::int AS players,
+        g.id AS game_id, g.name AS game, g.type, gg.name AS "group", count(*)::int AS won, count(DISTINCT p.email_norm)::int AS players,
         max(r.probability)::float AS probability, bool_or(r.active) AS active
-      ${BASE} JOIN play_rewards pr ON pr.play_id = p.id LEFT JOIN rewards r ON r.id = pr.reward_id
-      ${where(s2.w)} GROUP BY pr.reward_id, g.id, g.name, g.type, s.name ORDER BY won DESC`, s2.params);
+      ${BASE} JOIN play_rewards pr ON pr.play_id = p.id LEFT JOIN rewards r ON r.id = pr.reward_id LEFT JOIN store_groups gg ON gg.id = g.group_id
+      ${where(s2.w)} GROUP BY pr.reward_id, g.id, g.name, g.type, gg.name ORDER BY won DESC`, s2.params);
 
     const gp = P();
-    const gamePlays = q(`SELECT p.game_id, g.name AS game, g.type, s.name AS store, g.lose_percent::float AS lose_percent, count(*)::int AS n,
+    const gamePlays = q(`SELECT p.game_id, g.name AS game, g.type, gg.name AS "group", g.lose_percent::float AS lose_percent, count(*)::int AS n,
         count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM play_rewards x WHERE x.play_id = p.id))::int AS lost
-      ${BASE} ${where(gp.w)} GROUP BY 1, 2, 3, 4, 5`, gp.params);
+      ${BASE} LEFT JOIN store_groups gg ON gg.id = g.group_id ${where(gp.w)} GROUP BY 1, 2, 3, 4, 5`, gp.params);
 
     const by = (expr, extra = '') => { const x = P(); return q(`SELECT ${expr} AS key, ${extra} count(*)::int AS plays, count(DISTINCT p.email_norm)::int AS players
         ${BASE} ${where(x.w)} GROUP BY 1${extra ? ', 2' : ''} ORDER BY plays DESC`, x.params); };
     const byGroup = by(`coalesce(sg.name, 'Ungrouped')`);
     const byStore = by('s.name');
-    const byGame = (() => { const x = P(); return q(`SELECT g.name AS key, s.name AS store, g.type, count(*)::int AS plays, count(DISTINCT p.email_norm)::int AS players
-        ${BASE} ${where(x.w)} GROUP BY 1, 2, 3 ORDER BY plays DESC`, x.params); })();
+    const byGame = (() => { const x = P(); return q(`SELECT g.id AS game_id, g.name AS key, gg.name AS "group", g.type, count(*)::int AS plays, count(DISTINCT p.email_norm)::int AS players
+        ${BASE} LEFT JOIN store_groups gg ON gg.id = g.group_id ${where(x.w)} GROUP BY 1, 2, 3, 4 ORDER BY plays DESC`, x.params); })();
     const byType = by('g.type');
     const byLocale = by('p.locale');
 
@@ -139,7 +140,7 @@ export function registerReports(router, wrap, csvCell) {
     for (const x of rw.rows) x.game_plays = gpm.get(x.game_id) || 0;
     // losses ("no reward") as their own row per game, compared with the lose chance that is set
     for (const g of gpl.rows) if (g.lost || g.lose_percent > 0) rw.rows.push({ reward_id: `lost:${g.game_id}`, lost: true, title: { en: 'No reward (lost)', fr: 'Aucune récompense' }, code: '-',
-      game_id: g.game_id, game: g.game, type: g.type, store: g.store, won: g.lost, players: null, probability: g.lose_percent, active: true, game_plays: g.n });
+      game_id: g.game_id, game: g.game, type: g.type, group: g.group, won: g.lost, players: null, probability: g.lose_percent, active: true, game_plays: g.n });
 
     // fill empty buckets so the time axis is continuous
     const map = new Map(sr.rows.map((x) => [x.d, x])); const nmap = new Map(nr.rows.map((x) => [x.d, x.n]));
