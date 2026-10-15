@@ -70,7 +70,7 @@ render.yaml      Render Blueprint
 
 ## Visitor flow
 1. Visitor passes the theme's age verification.
-2. On the **homepage only**, the group's "Play to Win" popup appears right away (once per visit). Visitors can switch
+2. On the **homepage only**, the group's "Play to Win" popup appears 3 seconds after the age confirmation (once per visit). Visitors can switch
    EN / FR; their choice is remembered and also sets the language of their reminder email.
 3. **Play now** → pick a game (when the group has several) → email step (privacy notice) → game → code on screen.
    **No thanks** closes it; the floating button stays. After a play the button reads "Come back Monday" until the
