@@ -6,7 +6,14 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--rim) 28%, transparent), 0 8px 22px rgba(0,0,0,.35); }
 .trigger::after { content: ""; position: absolute; top: -40%; left: -60%; width: 40%; height: 180%; transform: rotate(20deg); background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: shine 3.2s ease-in-out infinite; }
 .trigger:hover { filter: brightness(1.08); }
-.trigger-suit { color: var(--suit, var(--rim)); font-size: 18px; line-height: 1; }
+.trigger-suit { color: var(--suit, var(--rim)); font-size: 18px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; width: 1.15em; height: 1.15em; flex: none; }
+/* a pill at the top of the page; scrolled down it shrinks to a round icon (the label slides away) */
+.trigger { transition: padding .3s ease, gap .3s ease, filter .15s; }
+.trigger-label { display: inline-block; max-width: 280px; overflow: hidden; white-space: nowrap; transition: max-width .3s ease, opacity .2s ease; }
+.trigger.mini { gap: 0; padding: 13px; }
+.trigger.mini .trigger-suit { font-size: 22px; }
+.trigger-suit { transition: font-size .3s ease; }
+.trigger.mini .trigger-label { max-width: 0; opacity: 0; }
 /* after a play this week: quieter, says when to come back (a different email can still play) */
 .trigger.played { background: var(--surface); color: var(--text); border-color: var(--border); box-shadow: 0 8px 22px rgba(0,0,0,.3); }
 .trigger.played::after { animation: none; }
@@ -255,6 +262,8 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 22px; f
 .pg-arcade .trigger { background: linear-gradient(135deg, var(--grad1), var(--grad2)); color: var(--on-grad, #fff); border: 3px solid #fff; font-family: inherit; font-weight: 700; font-size: 17px; letter-spacing: .01em; text-transform: none; padding: 11px 22px 11px 18px;
   box-shadow: 0 5px 0 color-mix(in srgb, var(--grad2) 60%, #000), 0 12px 26px rgba(0,0,0,.28); animation: arcade-bob 2.6s ease-in-out infinite; }
 .pg-arcade .trigger-suit { font-size: 20px; color: inherit; }
+.pg-arcade .trigger.mini { padding: 12px; }
+.pg-arcade .trigger.mini .trigger-suit { font-size: 24px; }
 @keyframes arcade-bob { 50% { transform: translateY(-5px); } }
 .pg-arcade .overlay { background: color-mix(in srgb, var(--grad2) 35%, rgba(0,0,0,.55)); }
 .pg-arcade .modal { color: var(--text); border: 4px solid #fff; border-radius: 28px; padding-top: 56px;

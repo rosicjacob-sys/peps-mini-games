@@ -91,9 +91,9 @@ function ageOverlay() {
 const gateBlocking = (sel) => bySelector(sel) || ageOverlay();
 
 // Where the visitor is with the age verification: 'blocked' (on screen, or the visitor was denied so it never
-// closes), 'clear' (just closed, or there is none) and 'ready' once it has stayed closed for 3 s. The game button and
+// closes), 'clear' (just closed, or there is none) and 'ready' once it has stayed closed for 5 s. The game button and
 // popup wait for 'ready'; if a slow age-check app shows up later, they hide again until it is answered.
-const INTRO_DELAY = 3000;   // the game popup shows 3 s after the visitor confirms their age
+const INTRO_DELAY = 5000;   // the game button and popup show 5 s after the visitor confirms their age
 const GATE_TICK = 250;
 function useAgeGate(sel, skip) {
   const [state, setState] = useState(skip ? 'ready' : 'blocked');
@@ -152,7 +152,15 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
   const [introCfg, setIntroCfg] = useState({});
   const [open, setOpen] = useState(false);
   const [intro, setIntro] = useState(false);
-  // the age verification: the game button and popup wait until it has been answered (3 s after)
+  // the Play & Win button is a pill at the top of the page and shrinks to a round icon once the visitor scrolls down
+  const [mini, setMini] = useState(false);
+  useEffect(() => {
+    if (preview) return undefined;
+    const onScroll = () => setMini(window.scrollY > 40);
+    onScroll(); window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  // the age verification: the game button and popup wait until it has been answered (5 s after)
   const gate = useAgeGate(ageSelector || DEFAULT_GATE, !!preview);
   const [game, setGame] = useState(null);
   const [played, setPlayed] = useState(() => (preview ? null : playedUntil(store)));
@@ -192,7 +200,7 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
     setOpen(true);
   }, [current?.id, gate]);
 
-  // Intro popup (the store group's): homepage only, every visit (once per browser session), 3 s after age
+  // Intro popup (the store group's): homepage only, every visit (once per browser session), 5 s after age
   // verification. A preview from the dashboard always shows it, straight away.
   useEffect(() => {
     if (!current || fromReminder || gate !== 'ready' || done.current.intro) return;
@@ -220,7 +228,11 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
 
   return (
     <div style={cssVars(current)} className={arcade ? 'pg-arcade' : 'pg-casino'}>
-      {(gate === 'ready' || open) && <button className={`trigger ${played ? 'played' : ''}`} onClick={openGame}><span className="trigger-suit" aria-hidden="true">{played ? '✓' : arcade ? '🎁' : '♠'}</span>{label}</button>}
+      {(gate === 'ready' || open) && (
+        <button className={`trigger ${played ? 'played' : ''} ${mini ? 'mini' : ''}`} onClick={openGame} aria-label={label} title={mini ? label : undefined}>
+          <span className="trigger-suit" aria-hidden="true">{played ? '✓' : arcade ? '🎁' : '♠'}</span><span className="trigger-label" aria-hidden="true">{label}</span>
+        </button>
+      )}
       {intro && gate === 'ready' && !open && <Intro cfg={introCfg} arcade={arcade} locale={locale} setLocale={setLocale} onPlay={() => finishIntro(true)} onDecline={() => finishIntro(false)} />}
       {open && (
         <Modal onClose={close} preview={preview} locale={locale}>

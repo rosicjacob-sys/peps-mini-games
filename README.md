@@ -70,13 +70,14 @@ render.yaml      Render Blueprint
 
 ## Visitor flow
 1. Visitor passes the theme's age verification.
-2. On the **homepage only**, the group's "Play to Win" popup appears 3 seconds after the age confirmation (once per visit). Visitors can switch
+2. On the **homepage only**, the group's "Play to Win" popup appears 5 seconds after the age confirmation (once per visit). Visitors can switch
    EN / FR; their choice is remembered and also sets the language of their reminder email.
 3. **Play now** → pick a game (when the group has several) → email step (privacy notice) → game → code on screen.
    **No thanks** closes it; the floating button stays. After a play the button reads "Come back Monday" until the
    next reset (a different email can still play). Escape closes any window; focus stays inside it.
 
-The **Play & Win button and the popup both wait** until the age verification has been answered, then 3 more seconds.
+The **Play & Win button and the popup both wait** until the age verification has been answered, then 5 more seconds.
+The button is a pill at the top of the page and shrinks to a round icon once the visitor scrolls down.
 The widget sees the gate as any fixed popup in the middle of the screen that talks about age ("18", "age",
 "verification", "âge"...), whatever the theme or app calls it, or an element matching
 `[id*="age-gate"], [class*="age-gate"], [data-age-gate]` (e.g. the Lexar theme's `#meridian-age-gate`). For a gate it
