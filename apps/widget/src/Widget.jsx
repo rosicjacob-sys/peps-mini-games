@@ -67,15 +67,16 @@ function gateBlocking(sel) {
   return false;
 }
 
-// Calls `cb` once the age-verification dialog is gone. While it is open (or the visitor was denied,
+// Calls `cb` once the age-verification dialog is gone, `delay` ms later. While it is open (or the visitor was denied,
 // so it never closes) the intro never appears.
-function whenAgeGateClear(sel, cb) {
-  let clear = 0;
+const INTRO_DELAY = 3000;   // the game popup shows 3 s after the visitor confirms their age
+function whenAgeGateClear(sel, cb, delay = 0) {
+  let clear = 0, wait = 0;
   const id = setInterval(() => {
     clear = gateBlocking(sel) ? 0 : clear + 1;
-    if (clear >= 2) { clearInterval(id); cb(); }
+    if (clear >= 2) { clearInterval(id); wait = setTimeout(cb, delay); }
   }, 200);
-  return () => clearInterval(id);
+  return () => { clearInterval(id); clearTimeout(wait); };
 }
 
 // Dialog behaviour for a modal: Escape closes it, Tab stays inside it, and the element that had focus (the
@@ -154,8 +155,8 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
     return whenAgeGateClear(ageSelector || DEFAULT_GATE, () => setOpen(true));
   }, [current?.id]);
 
-  // Intro popup (the store group's): homepage only, every visit (once per browser session), straight after age
-  // verification. A preview from the dashboard always shows it.
+  // Intro popup (the store group's): homepage only, every visit (once per browser session), 3 s after age
+  // verification. A preview from the dashboard always shows it, straight away.
   useEffect(() => {
     if (!current || fromReminder) return;
     if (introCfg.enabled === false) return;
@@ -163,7 +164,7 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
       if (introPages !== 'all' && !isHome()) return;
       if (store_(() => sessionStorage.getItem('pg_intro_done')) || played) return;
     }
-    return whenAgeGateClear(ageSelector || DEFAULT_GATE, () => setIntro(true));
+    return whenAgeGateClear(ageSelector || DEFAULT_GATE, () => setIntro(true), preview ? 0 : INTRO_DELAY);
   }, [current?.id]);
 
   const finishIntro = (play) => {
