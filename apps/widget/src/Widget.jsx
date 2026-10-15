@@ -55,28 +55,61 @@ const markPlayed = (storeKey, until) => store_(() => until && localStorage.setIt
 // the visitor-facing name of a game: its heading, else its type ("Prize Wheel"); never the admin's internal name
 const gameTitle = (g, locale) => t(g.texts?.heading, locale) || GAME_TYPES[g.type]?.label || g.name;
 
-function gateBlocking(sel) {
+// Is the store's age verification on screen? Either an element matching `sel` (data-age-selector, or a name like
+// "age-gate"), or any fixed popup in the middle of the screen that talks about age (most age-check apps and themes
+// look like that, whatever they are called). Our own windows are skipped, so a gate under them still counts.
+const AGE_TEXT = /\b(?:18|19|21)\b|\bage\b|âge|\bverif|vérif|older|majeur|legal/i;
+// names like age-gate, ageVerification, av_age_check (not "page" or "image")
+const AGE_NAME = /age[-_]?(?:gate|verif|check|confirm|popup|modal)|(?:^|[\s_-])age(?:[\s_-]|$)|verif/i;
+function bySelector(sel) {
   let els = [];
   try { els = document.querySelectorAll(sel); } catch { return false; }
   for (const el of els) {
     if (el.hidden || el.getAttribute('data-open') === 'false') continue;
     const cs = getComputedStyle(el);
-    if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+    if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue;
     return true;
   }
   return false;
 }
+function ageOverlay() {
+  const w = innerWidth, h = innerHeight;
+  for (const [x, y] of [[w / 2, h / 2], [w / 2, h * 0.35], [w / 2, h * 0.65]]) {
+    // the topmost thing at that spot, ignoring our own windows
+    const hit = (document.elementsFromPoint?.(x, y) || []).find((e) => !e.closest('[data-peps-games]'));
+    for (let el = hit; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+      const cs = getComputedStyle(el);
+      if (cs.position !== 'fixed' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue;
+      if (el.tagName === 'IFRAME') { if (AGE_NAME.test(`${el.id} ${el.title} ${el.src}`)) return true; continue; }
+      // a popup is short; a fixed wrapper around the whole page is not
+      const text = (el.textContent || '').trim();
+      if (text.length < 1500 && (AGE_TEXT.test(text) || AGE_NAME.test(`${el.id} ${el.getAttribute('class') || ''}`))) return true;
+    }
+  }
+  return false;
+}
+const gateBlocking = (sel) => bySelector(sel) || ageOverlay();
 
-// Calls `cb` once the age-verification dialog is gone, `delay` ms later. While it is open (or the visitor was denied,
-// so it never closes) the intro never appears.
+// Where the visitor is with the age verification: 'blocked' (on screen, or the visitor was denied so it never
+// closes), 'clear' (just closed, or there is none) and 'ready' once it has stayed closed for 3 s. The game button and
+// popup wait for 'ready'; if a slow age-check app shows up later, they hide again until it is answered.
 const INTRO_DELAY = 3000;   // the game popup shows 3 s after the visitor confirms their age
-function whenAgeGateClear(sel, cb, delay = 0) {
-  let clear = 0, wait = 0;
-  const id = setInterval(() => {
-    clear = gateBlocking(sel) ? 0 : clear + 1;
-    if (clear >= 2) { clearInterval(id); wait = setTimeout(cb, delay); }
-  }, 200);
-  return () => { clearInterval(id); clearTimeout(wait); };
+const GATE_TICK = 250;
+function useAgeGate(sel, skip) {
+  const [state, setState] = useState(skip ? 'ready' : 'blocked');
+  useEffect(() => {
+    if (skip) return undefined;
+    let since = null;
+    const tick = () => {
+      const now = Date.now();
+      if (gateBlocking(sel)) since = null; else if (since === null) since = now;
+      const quiet = since === null ? -1 : now - since;
+      setState(quiet >= INTRO_DELAY ? 'ready' : quiet >= 2 * GATE_TICK ? 'clear' : 'blocked');
+    };
+    tick(); const id = setInterval(tick, GATE_TICK);
+    return () => clearInterval(id);
+  }, [sel, skip]);
+  return state;
 }
 
 // Dialog behaviour for a modal: Escape closes it, Tab stays inside it, and the element that had focus (the
@@ -119,6 +152,8 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
   const [introCfg, setIntroCfg] = useState({});
   const [open, setOpen] = useState(false);
   const [intro, setIntro] = useState(false);
+  // the age verification: the game button and popup wait until it has been answered (3 s after)
+  const gate = useAgeGate(ageSelector || DEFAULT_GATE, !!preview);
   const [game, setGame] = useState(null);
   const [played, setPlayed] = useState(() => (preview ? null : playedUntil(store)));
 
@@ -147,25 +182,28 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
   const close = () => { setOpen(false); if (games?.length > 1) setGame(null); };
   const onPlayed = (until) => { if (preview) return; markPlayed(store, until); setPlayed(until); };
 
-  // Arriving from a reminder email (?pg_play=1): open the game straight away, after age verification.
+  // Arriving from a reminder email (?pg_play=1): open the game as soon as the age verification is answered.
   const fromReminder = useMemo(() => store_(() => new URLSearchParams(location.search).has('pg_play')), []);
+  const done = useRef({ reminder: false, intro: false });
   useEffect(() => {
-    if (!current || !fromReminder) return;
+    if (!current || !fromReminder || gate === 'blocked' || done.current.reminder) return;
+    done.current.reminder = true;
     store_(() => { const u = new URL(location.href); u.searchParams.delete('pg_play'); history.replaceState(history.state, '', u); });
-    return whenAgeGateClear(ageSelector || DEFAULT_GATE, () => setOpen(true));
-  }, [current?.id]);
+    setOpen(true);
+  }, [current?.id, gate]);
 
   // Intro popup (the store group's): homepage only, every visit (once per browser session), 3 s after age
   // verification. A preview from the dashboard always shows it, straight away.
   useEffect(() => {
-    if (!current || fromReminder) return;
+    if (!current || fromReminder || gate !== 'ready' || done.current.intro) return;
+    done.current.intro = true;
     if (introCfg.enabled === false) return;
     if (!preview) {
       if (introPages !== 'all' && !isHome()) return;
       if (store_(() => sessionStorage.getItem('pg_intro_done')) || played) return;
     }
-    return whenAgeGateClear(ageSelector || DEFAULT_GATE, () => setIntro(true), preview ? 0 : INTRO_DELAY);
-  }, [current?.id]);
+    setIntro(true);
+  }, [current?.id, gate]);
 
   const finishIntro = (play) => {
     if (!preview) store_(() => sessionStorage.setItem('pg_intro_done', '1'));
@@ -182,8 +220,8 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
 
   return (
     <div style={cssVars(current)} className={arcade ? 'pg-arcade' : 'pg-casino'}>
-      <button className={`trigger ${played ? 'played' : ''}`} onClick={openGame}><span className="trigger-suit" aria-hidden="true">{played ? '✓' : arcade ? '🎁' : '♠'}</span>{label}</button>
-      {intro && !open && <Intro cfg={introCfg} arcade={arcade} locale={locale} setLocale={setLocale} onPlay={() => finishIntro(true)} onDecline={() => finishIntro(false)} />}
+      {(gate === 'ready' || open) && <button className={`trigger ${played ? 'played' : ''}`} onClick={openGame}><span className="trigger-suit" aria-hidden="true">{played ? '✓' : arcade ? '🎁' : '♠'}</span>{label}</button>}
+      {intro && gate === 'ready' && !open && <Intro cfg={introCfg} arcade={arcade} locale={locale} setLocale={setLocale} onPlay={() => finishIntro(true)} onDecline={() => finishIntro(false)} />}
       {open && (
         <Modal onClose={close} preview={preview} locale={locale}>
           <LangToggle locale={locale} setLocale={setLocale} />
