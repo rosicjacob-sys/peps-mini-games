@@ -76,8 +76,11 @@ render.yaml      Render Blueprint
    **No thanks** closes it; the floating button stays. After a play the button reads "Come back Monday" until the
    next reset (a different email can still play). Escape closes any window; focus stays inside it.
 
-The popup waits for the age gate by watching for an element matching `[id*="age-gate"], [class*="age-gate"], [data-age-gate]`
-(matches the Lexar theme's `#meridian-age-gate`). If a store group's theme uses a different gate, set it on the script tag.
+The **Play & Win button and the popup both wait** until the age verification has been answered, then 3 more seconds.
+The widget sees the gate as any fixed popup in the middle of the screen that talks about age ("18", "age",
+"verification", "âge"...), whatever the theme or app calls it, or an element matching
+`[id*="age-gate"], [class*="age-gate"], [data-age-gate]` (e.g. the Lexar theme's `#meridian-age-gate`). For a gate it
+misses, set `data-age-selector="<css selector>"` on the script tag. A visitor who answers "under 18" never sees the games.
 
 **Display font.** Headings and primary buttons use "Coffee Tin" when it is self-hosted in `apps/widget/public/fonts/`
 (see the README there), otherwise "Rye" from Google Fonts. Arcade games use "Fredoka".
