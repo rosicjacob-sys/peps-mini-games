@@ -24,7 +24,7 @@ export const introDefaults = () => ({
   declineLabel: L(INTRO_DEFAULTS.en.declineLabel, INTRO_DEFAULTS.fr.declineLabel),
 });
 
-// The "Play to Win" popup visitors see on the homepage 5 seconds after age verification. One per store group:
+// The "Play to Win" popup visitors see on the homepage 13 seconds after age verification. One per store group:
 // every store in the group shows it, whatever games the group has.
 export default function IntroEditor({ value, onChange }) {
   const intro = { enabled: true, image: '', steps: [], ...(value || {}) };
@@ -37,7 +37,7 @@ export default function IntroEditor({ value, onChange }) {
         <label className="check"><input type="checkbox" checked={intro.enabled} onChange={(e) => set({ enabled: e.target.checked })} /> Show the popup on the homepage</label>
         <button type="button" onClick={() => set(introDefaults())}>Fill with suggested copy</button>
       </div>
-      <p className="muted">Shown on the homepage of every store in this group, every visit, 5 seconds after the visitor confirms their age. Visitors can pick English or French in the popup. Blank fields use the suggested copy shown in grey.</p>
+      <p className="muted">Shown on the homepage of every store in this group, every visit, 13 seconds after the visitor confirms their age. Visitors can pick English or French in the popup. Blank fields use the suggested copy shown in grey.</p>
       <Loc label="Heading" value={intro.heading} onChange={(v) => set({ heading: v })} ph={ph('heading', 'en')} />
       <Loc label="Description" rows="3" value={intro.description} onChange={(v) => set({ description: v })} ph={ph('description', 'en')} />
       <h3>How to win (steps)</h3>

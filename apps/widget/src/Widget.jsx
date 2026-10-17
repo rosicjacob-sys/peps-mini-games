@@ -91,12 +91,14 @@ function ageOverlay() {
 const gateBlocking = (sel) => bySelector(sel) || ageOverlay();
 
 // Where the visitor is with the age verification: 'blocked' (on screen, or the visitor was denied so it never
-// closes), 'clear' (just closed, or there is none) and 'ready' once it has stayed closed for 5 s. The game button and
-// popup wait for 'ready'; if a slow age-check app shows up later, they hide again until it is answered.
-const INTRO_DELAY = 5000;   // the game button and popup show 5 s after the visitor confirms their age
+// closes), 'clear' (just closed, or there is none), 'ready' once it has stayed closed for 5 s (the Play & Win button
+// shows) and 'popup' after 13 s (the game popup shows). If a slow age-check app shows up later, both hide again
+// until it is answered.
+const BUTTON_DELAY = 5000;   // the Play & Win button shows 5 s after the visitor confirms their age
+const INTRO_DELAY = 13000;   // the game popup shows 13 s after
 const GATE_TICK = 250;
 function useAgeGate(sel, skip) {
-  const [state, setState] = useState(skip ? 'ready' : 'blocked');
+  const [state, setState] = useState(skip ? 'popup' : 'blocked');
   useEffect(() => {
     if (skip) return undefined;
     let since = null;
@@ -104,7 +106,7 @@ function useAgeGate(sel, skip) {
       const now = Date.now();
       if (gateBlocking(sel)) since = null; else if (since === null) since = now;
       const quiet = since === null ? -1 : now - since;
-      setState(quiet >= INTRO_DELAY ? 'ready' : quiet >= 2 * GATE_TICK ? 'clear' : 'blocked');
+      setState(quiet >= INTRO_DELAY ? 'popup' : quiet >= BUTTON_DELAY ? 'ready' : quiet >= 2 * GATE_TICK ? 'clear' : 'blocked');
     };
     tick(); const id = setInterval(tick, GATE_TICK);
     return () => clearInterval(id);
@@ -160,7 +162,7 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
     onScroll(); window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
-  // the age verification: the game button and popup wait until it has been answered (5 s after)
+  // the age verification: the button waits until it has been answered (5 s after), the popup 13 s after
   const gate = useAgeGate(ageSelector || DEFAULT_GATE, !!preview);
   const [game, setGame] = useState(null);
   const [played, setPlayed] = useState(() => (preview ? null : playedUntil(store)));
@@ -200,10 +202,10 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
     setOpen(true);
   }, [current?.id, gate]);
 
-  // Intro popup (the store group's): homepage only, every visit (once per browser session), 5 s after age
+  // Intro popup (the store group's): homepage only, every visit (once per browser session), 13 s after age
   // verification. A preview from the dashboard always shows it, straight away.
   useEffect(() => {
-    if (!current || fromReminder || gate !== 'ready' || done.current.intro) return;
+    if (!current || fromReminder || gate !== 'popup' || done.current.intro) return;
     done.current.intro = true;
     if (introCfg.enabled === false) return;
     if (!preview) {
@@ -228,12 +230,12 @@ export default function Widget({ store, api, locale: rawLocale, gameType, ageSel
 
   return (
     <div style={cssVars(current)} className={arcade ? 'pg-arcade' : 'pg-casino'}>
-      {(gate === 'ready' || open) && (
+      {(gate === 'ready' || gate === 'popup' || open) && (
         <button className={`trigger ${played ? 'played' : ''} ${mini ? 'mini' : ''}`} onClick={openGame} aria-label={label} title={mini ? label : undefined}>
           <span className="trigger-suit" aria-hidden="true">{played ? '✓' : arcade ? '🎁' : '♠'}</span><span className="trigger-label" aria-hidden="true">{label}</span>
         </button>
       )}
-      {intro && gate === 'ready' && !open && <Intro cfg={introCfg} arcade={arcade} locale={locale} setLocale={setLocale} onPlay={() => finishIntro(true)} onDecline={() => finishIntro(false)} />}
+      {intro && gate === 'popup' && !open && <Intro cfg={introCfg} arcade={arcade} locale={locale} setLocale={setLocale} onPlay={() => finishIntro(true)} onDecline={() => finishIntro(false)} />}
       {open && (
         <Modal onClose={close} preview={preview} locale={locale}>
           <LangToggle locale={locale} setLocale={setLocale} />
